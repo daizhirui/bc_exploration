@@ -15,7 +15,7 @@ setup(
     long_description=long_description,
     author='Alexander Khoury',
     author_email='akhoury727@gmail.com',
-    url='https://github.com/braincorp/bc_exploration',
+    url='https://github.com/daizhirui/diff_info_gathering.git',
     download_url='',
     license='Braincorp',
     install_requires=['numpy>=1.11.0',
