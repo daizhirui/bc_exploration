@@ -139,16 +139,6 @@ namespace exploration {
         return std::make_pair(isSuccessful, pathPX);
     }
 
-
-    inline std::vector<float>
-    getAstarAngles() {
-        // these angles correspond to the x,y world converted
-        // angles of moving in the corresponding
-        // children direction in the astar algorithm
-        // see astar assignment of children.
-        return {-M_PI, -3. * M_PI_4, -M_PI_2, -M_PI_4, 0., M_PI_4, M_PI_2, 3. * M_PI_4};
-    }
-
     std::pair<bool, Eigen::MatrixX3f>
     orientedAstar(
         const Eigen::Ref<const Eigen::Vector2i> &start,

@@ -67,6 +67,19 @@ class CMakeBuild(build_ext):
             ['cmake', '--build', '.', '--target', f'{ext.name}', '--', '-j', f'{os.cpu_count()}'], cwd=build_temp
         )
 
+
+with open('requirements.txt', 'r') as f:
+    requires = f.readlines()
+dependency_links = []
+for i in range(len(requires)):
+    require = requires[i]
+    if require.startswith('git'):
+        # dependency_links.append(require)
+        name = require.split('=')[-1].strip()
+        version = require.split('#egg')[0].split('@')[1]
+        requires[i] = f'{name} @ {require.strip()}'
+
+
 setup(
     name='bc_exploration',
     version='0.0.1',
@@ -77,9 +90,7 @@ setup(
     url='https://github.com/daizhirui/diff_info_gathering.git',
     download_url='',
     license='Braincorp',
-    install_requires=[
-        'numpy==1.22.3', 'matplotlib', 'opencv-python', 'pyyaml'
-    ],
+    install_requires=requires,
     package_data={'': ['input', 'params/*'], 'bc_exploration.maps': ['test/*']},
     include_package_data=True,
     extras_require={
@@ -104,7 +115,6 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
     packages=find_packages(os.path.join(_src_python_dir, '..')),
-    # ext_package='bc_exploration',
     cmdclass=dict(build_ext=CMakeBuild),
     ext_modules=[CMakeExtension('_exploration_cpp')]
 )

@@ -1,4 +1,3 @@
-# README
 environments and algorithms for exploration
 
 Implemented an exploration simulation framework with modularity in:
@@ -13,3 +12,5 @@ Frontier-based exploration implemented with a few different behavioral modes, ea
 
 Includes integration with online mapping.
 Includes benchmarking framework / benchmarks
+
+# Install

@@ -2,7 +2,3 @@ numpy==1.22.3
 opencv-python
 matplotlib
 pyyaml
-wheel
-pybind11
-ninja
-setuptools
