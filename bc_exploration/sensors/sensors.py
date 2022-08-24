@@ -67,7 +67,7 @@ class Neighborhood(Sensor):
         :param occupancy_map Costmap: the ground truth of which to sample from
         """
         self._map = occupancy_map
-        self._range_px = np.rint(self._range / occupancy_map.resolution).astype(np.int)
+        self._range_px = np.rint(self._range / occupancy_map.resolution).astype(int)
 
     def measure(self, state, debug=False):
         """
@@ -101,11 +101,14 @@ class Neighborhood(Sensor):
         coords = []
         for value in self.values:
             value_coords = np.argwhere(ego_map == value) - ego_state + min_range
-            is_valid = np.logical_and(np.all(value_coords >= 0, axis=1),
-                                      np.logical_and(value_coords[:, 0] < self._map.data.shape[0],
-                                                     value_coords[:, 1] < self._map.data.shape[1]))
+            x = value_coords[:, 0]
+            y = value_coords[:, 1]
+            is_valid = (x >= 0) & (x < self._map.data.shape[0]) & (y >= 0) & (y < self._map.data.shape[1])
+            # is_valid = np.logical_and(np.all(value_coords >= 0, axis=1),
+            #                           np.logical_and(value_coords[:, 0] < self._map.data.shape[0],
+            #                                          value_coords[:, 1] < self._map.data.shape[1]))
 
-            coords.append(value_coords[is_valid] - state[:2].astype(np.int))
+            coords.append(value_coords[is_valid] - state[:2].astype(int))
 
         return coords
 
@@ -126,7 +129,7 @@ class Laser(Sensor):
         assert angle_increment >= 1
         self.angle_range = wrap_angles(np.array(angle_range))
         self.map_resolution = map_resolution
-        self.range_px = np.rint(sensor_range / map_resolution).astype(np.int)
+        self.range_px = np.rint(sensor_range / map_resolution).astype(int)
         self.angle_increment = angle_increment
         self.ray_angles, self.circle_rays = self._generate_circle_rays()
 
@@ -141,12 +144,12 @@ class Laser(Sensor):
         # we define - to be left of y axis and + to be right of y axis, and y axis to be 0 degrees
         # todo change this to brains format 0 degrees right neg down pos up
         range_points = self.range_px * np.vstack(([-np.cos(angles * np.pi / 180)], [np.sin(angles * np.pi / 180)])).T
-        circle_coords = np.round(range_points).astype(np.int)
+        circle_coords = np.round(range_points).astype(int)
         if debug:
             plt.scatter(circle_coords[:, 0], circle_coords[:, 1])
             plt.show()
 
-        circle_rays = [bresenham2d([0, 0], circle_coord).astype(np.int) for circle_coord in circle_coords.tolist()]
+        circle_rays = [bresenham2d([0, 0], circle_coord).astype(int) for circle_coord in circle_coords.tolist()]
 
         return angles, circle_rays
 
@@ -168,7 +171,7 @@ class Laser(Sensor):
                                                shifted_angle_range[1] + self.angle_increment,
                                                self.angle_increment), is_radians=False)
 
-        state_rays = [(circle_ray + state[:2]).astype(np.int) for i, circle_ray in enumerate(self.circle_rays)
+        state_rays = [(circle_ray + state[:2]).astype(int) for i, circle_ray in enumerate(self.circle_rays)
                       if self.ray_angles[i] in desired_angles]
 
         return state_rays
@@ -211,8 +214,8 @@ class Laser(Sensor):
             else:
                 free.extend(ray)
 
-        return [np.array(occupied) - state[:2].astype(np.int) if len(occupied) else np.empty((0,)),
-                np.array(free) - state[:2].astype(np.int) if len(free) else np.empty((0,))]
+        return [np.array(occupied) - state[:2].astype(int) if len(occupied) else np.empty((0,)),
+                np.array(free) - state[:2].astype(int) if len(free) else np.empty((0,))]
 
 
 class Lidar(Sensor):
@@ -242,8 +245,8 @@ class Lidar(Sensor):
         angles = np.arange(-self._angular_range / 2, self._angular_range / 2 + self._angular_resolution, self._angular_resolution)
 
         ray_points = self._range * np.array([np.cos(angles), np.sin(angles)]).T
-        ray_points_px = np.rint(ray_points / self._map_resolution).astype(np.int)[:, ::-1] * [-1, 1]
-        ego_rays = [bresenham2d([0, 0], ray_point_px).astype(np.int) for ray_point_px in ray_points_px]
+        ray_points_px = np.rint(ray_points / self._map_resolution).astype(int)[:, ::-1] * [-1, 1]
+        ego_rays = [bresenham2d([0, 0], ray_point_px).astype(int) for ray_point_px in ray_points_px]
 
         return angles, ego_rays
 
@@ -262,21 +265,27 @@ class Lidar(Sensor):
         :return Tuple[array(N)[float], array(N)[float]]: [lidar angles radians, lidar ranges meters] if ray did not hit obstacle, value is np.nan
         """
         assert self._map is not None \
-            and "Please set the map using set_map() before calling measure, this will initialize lidar as well."
+               and "Please set the map using set_map() before calling measure, this will initialize lidar as well."
 
         pose = state.copy()
         pose_px = xy_to_rc(pose, self._map)
 
         ranges = np.zeros_like(self._ray_angles)
+        rotation_matrix = get_rotation_matrix_2d(-state[2])
         for i, ego_ray in enumerate(self._ego_rays):
-            rotation_matrix = get_rotation_matrix_2d(-state[2])
             rotated_ray = np.rint(ego_ray.dot(rotation_matrix))
-            ray = (pose_px[:2] + rotated_ray).astype(np.int)
+            ray = (pose_px[:2] + rotated_ray).astype(int)
             ray = ray[which_coords_in_bounds(ray, self._map.get_shape())]
-            occupied_ind = np.argwhere(self._map.data[ray[:, 0], ray[:, 1]] == Costmap.OCCUPIED)
-            if occupied_ind.shape[0]:
-                ranges[i] = np.linalg.norm(pose_px[:2] - ray[int(occupied_ind[0])]) * self._map.resolution
-            else:
+
+            # occupied_ind = np.argwhere(self._map.data[ray[:, 0], ray[:, 1]] == Costmap.OCCUPIED)
+            # if occupied_ind.shape[0]:
+            #     ranges[i] = np.linalg.norm(pose_px[:2] - ray[int(occupied_ind[0])]) * self._map.resolution
+            # else:
+            #     ranges[i] = np.nan
+            try:
+                occupied_ind = self._map.data[ray[:, 0], ray[:, 1]].tolist().index(Costmap.OCCUPIED)
+                ranges[i] = np.linalg.norm(pose_px[:2] - ray[int(occupied_ind)]) * self._map.resolution
+            except ValueError:
                 ranges[i] = np.nan
 
         if debug:

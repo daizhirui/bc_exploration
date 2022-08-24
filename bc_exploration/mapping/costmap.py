@@ -78,19 +78,16 @@ class Costmap:
         """
         assert self.resolution <= desired_resolution
         scale_factor = self.resolution / desired_resolution
-        scaled_shape = np.rint(np.array(self.data.shape) * scale_factor).astype(np.int)
+        scaled_shape = np.rint(np.array(self.data.shape) * scale_factor).astype(int)
         scaled_data = np.zeros(scaled_shape)
 
-        scaled_occupied_coords = np.rint(np.argwhere(self.data == Costmap.OCCUPIED) * scale_factor).astype(np.int)
-        scaled_unexplored_coords = np.rint(np.argwhere(self.data == Costmap.UNEXPLORED) * scale_factor).astype(np.int)
-        scaled_free_coords = np.rint(np.argwhere(self.data == Costmap.FREE) * scale_factor).astype(np.int)
+        scaled_occupied_coords = np.rint(np.argwhere(self.data == Costmap.OCCUPIED) * scale_factor).astype(int)
+        scaled_unexplored_coords = np.rint(np.argwhere(self.data == Costmap.UNEXPLORED) * scale_factor).astype(int)
+        scaled_free_coords = np.rint(np.argwhere(self.data == Costmap.FREE) * scale_factor).astype(int)
 
-        scaled_occupied_coords = scaled_occupied_coords[which_coords_in_bounds(scaled_occupied_coords,
-                                                                               scaled_shape)]
-        scaled_unexplored_coords = scaled_unexplored_coords[which_coords_in_bounds(scaled_unexplored_coords,
-                                                                                   scaled_shape)]
-        scaled_free_coords = scaled_free_coords[which_coords_in_bounds(scaled_free_coords,
-                                                                       scaled_shape)]
+        scaled_occupied_coords = scaled_occupied_coords[which_coords_in_bounds(scaled_occupied_coords, scaled_shape)]
+        scaled_unexplored_coords = scaled_unexplored_coords[which_coords_in_bounds(scaled_unexplored_coords, scaled_shape)]
+        scaled_free_coords = scaled_free_coords[which_coords_in_bounds(scaled_free_coords, scaled_shape)]
 
         # order is important here, we want to make sure to keep the obstacles
         scaled_data[scaled_free_coords[:, 0], scaled_free_coords[:, 1]] = Costmap.FREE

@@ -1,29 +1,37 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.16)
 project(bc_exploration)
 
-set(CMAKE_BUILD_TYPE RELEASE)
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bc_exploration)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -O3 -Wall -fpic")
+if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fPIC ")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+endif ()
 
-# find current version of python 2.7
-execute_process(
-        COMMAND "python2.7" -c "from distutils import sysconfig; print(sysconfig.get_python_inc())"
-        OUTPUT_VARIABLE PYTHON_INCLUDE_DIRS
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+if (NOT OpenMP_FOUND)
+    find_package(OpenMP REQUIRED)
+endif ()
 
-include_directories(
-    ${PYTHON_INCLUDE_DIRS}
-    "${PROJECT_SOURCE_DIR}/bc_exploration/cpp/inc/"
-    "${PROJECT_SOURCE_DIR}/deps/pybind11/include"
-)
+if (NOT Python_FOUND)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
+    include_directories(SYSTEM ${Python3_INCLUDE_DIRS})
+    include_directories(SYSTEM ${Python3_NumPy_INCLUDE_DIRS})
+endif ()
+
+include_directories(SYSTEM deps/eigen)
+add_subdirectory(deps/pybind11)
+include_directories(SYSTEM deps/pybind11/include)
+include_directories(${PROJECT_SOURCE_DIR}/bc_exploration/cpp/include)
 
 set(SOURCE_FILES
+        bc_exploration/cpp/src/python.cpp
         bc_exploration/cpp/src/exploration/astar.cpp
-        bc_exploration/cpp/src/exploration/collision.cpp
-        bc_exploration/cpp/src/exploration/util.cpp
-        )
+        bc_exploration/cpp/src/exploration/collision.cpp)
 
-add_library(exploration_cpp SHARED ${PROJECT_SOURCE_DIR} ${SOURCE_FILES} bc_exploration/cpp/src/exploration/python.cpp)
-target_link_libraries(exploration_cpp ${PYTHON_LIBRARIES})
-set_target_properties(exploration_cpp PROPERTIES SUFFIX ".so" PREFIX "_")
+#add_library(bc_exploration STATIC ${PROJECT_SOURCE_DIR} ${SOURCE_FILES} bc_exploration/cpp/src/exploration/python.cpp)
+#target_link_libraries(bc_exploration ${PYTHON_LIBRARIES} OpenMP::OpenMP_CXX)
+#set_target_properties(exploration_cpp PROPERTIES SUFFIX ".so" PREFIX "_")
+
+pybind11_add_module(_exploration_cpp ${SOURCE_FILES} NO_EXTRAS)
+target_link_libraries(_exploration_cpp PUBLIC ${PYTHON_LIBRARIES} OpenMP::OpenMP_CXX)

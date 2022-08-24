@@ -26,8 +26,11 @@ def get_rotation_matrix_2d(angle):
     :param angle float: angle in radians
     :return array(2, 2)[float]: 2D rotation matrix
     """
-    return np.array([[np.cos(angle), -np.sin(angle)],
-                     [np.sin(angle), np.cos(angle)]])
+    s = np.sin(angle)
+    c = np.cos(angle)
+    return np.array([[c, -s], [s, c]])
+    # return np.array([[np.cos(angle), -np.sin(angle)],
+    #                  [np.sin(angle), np.cos(angle)]])
 
 
 def which_coords_in_bounds(coords, map_shape):
@@ -40,11 +43,14 @@ def which_coords_in_bounds(coords, map_shape):
     """
     assert isinstance(coords, np.ndarray) and coords.dtype == np.int
     assert np.array(map_shape).dtype == np.int
+    assert coords.size > 0
     if len(coords.shape) == 1:
-        return coords[0] >= 0 and coords[0] < map_shape[0] and coords[1] >= 0 and coords[1] < map_shape[1]
+        return (coords[0] >= 0) and (coords[0] < map_shape[0]) and (coords[1] >= 0) and (coords[1] < map_shape[1])
     else:
-        return np.logical_and(np.logical_and(coords[:, 0] >= 0, coords[:, 0] < map_shape[0]),
-                              np.logical_and(coords[:, 1] >= 0, coords[:, 1] < map_shape[1]))
+        x = coords[:, 0]
+        y = coords[:, 1]
+        return np.logical_and(np.logical_and(x >= 0, x < map_shape[0]),
+                              np.logical_and(y >= 0, y < map_shape[1]))
 
 
 def wrap_angles(angles, is_radians=True):
@@ -114,7 +120,7 @@ def compute_connected_pixels(start_state, image, flood_value=77, debug=False):
     truth_floodfill = image.copy()
 
     assert flood_value not in np.unique(image).tolist()
-    cv2.floodFill(truth_floodfill, mask, tuple(start_state[:2][::-1].astype(np.int)), flood_value)
+    cv2.floodFill(truth_floodfill, mask, tuple(start_state[:2][::-1].astype(int)), flood_value)
 
     if debug:
         cv2.imshow("", truth_floodfill)

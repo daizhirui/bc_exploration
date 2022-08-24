@@ -54,7 +54,7 @@ class GridWorld:
 
         self._load_map(map_filename, map_resolution, map_padding)
 
-        self._start_state = np.array(start_state).astype(np.float) \
+        self._start_state = np.array(start_state).astype(float) \
             if start_state is not None else self.get_random_start_state()
         assert self._start_state.shape[0] == 3
 
@@ -84,7 +84,7 @@ class GridWorld:
             valid = self._is_state_valid(np.concatenate((valid_points[choice], [0])))
 
         # todo add random angle
-        return np.concatenate((valid_points[choice], [0])).astype(np.float)
+        return np.concatenate((valid_points[choice], [0])).astype(float)
 
     def _is_state_valid(self, state, use_inflation=True):
         """
@@ -123,8 +123,8 @@ class GridWorld:
             start_state_px = xy_to_rc(self._start_state, self._map)
             self._truth_free_coords = compute_connected_pixels(start_state_px, self._map.data)
 
-        free_coords = np.argwhere(occupancy_map.data == Costmap.FREE)
-        return free_coords.shape[0] / float(self._truth_free_coords.shape[0])
+        # free_coords = np.argwhere(occupancy_map.data == Costmap.FREE)
+        return np.sum(occupancy_map.data == Costmap.FREE) / float(self._truth_free_coords.shape[0])
 
     def step(self, desired_state):
         """
@@ -134,7 +134,7 @@ class GridWorld:
         :return array(3)[float]: new_state (new robot position), sensor_data (output from sensor)
         """
         # sanitize input
-        new_state = np.array(desired_state, dtype=np.float)
+        new_state = np.array(desired_state, dtype=float)
         new_state[2] = wrap_angles(desired_state[2])
 
         # if desired state is not valid, we dont move the robot
@@ -166,7 +166,7 @@ class GridWorld:
         # convert to colored image
         map_vis = cv2.cvtColor(self._map.data.copy(), cv2.COLOR_GRAY2BGR)
 
-        state_px = xy_to_rc(self._state + self._start_state, self._map)[:2].astype(np.int)
+        state_px = xy_to_rc(self._state + self._start_state, self._map)[:2].astype(int)
         map_vis[state_px[0], state_px[1]] = [127, 122, 10]
         # # todo figure out programmatic way to pick circle size (that works well)
         # cv2.circle(map_vis, tuple(self.state[:2][::-1].astype(int)), 1, [127, 122, 10], thickness=-1)

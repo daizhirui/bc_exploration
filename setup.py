@@ -1,12 +1,71 @@
-"""setup.py
-setup.py for bc_exploration
-"""
-from __future__ import print_function, absolute_import, division
+import argparse
+import os
+import shutil
+import subprocess
+import sys
 
-from setuptools import setup, find_packages, Extension
+from setuptools import Extension
+from setuptools import setup, find_packages
+from setuptools.command.build_ext import build_ext
 
 with open("README.md", "r") as f:
     long_description = f.read()
+
+
+_project_dir = os.path.abspath(os.path.dirname(__file__))
+_src_python_dir = os.path.join(_project_dir, 'bc_exploration')
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--debug', action='store_true')
+parser.add_argument('--clean-before-build', action='store_true')
+args, unknown = parser.parse_known_args()
+sys.argv = [sys.argv[0]] + unknown
+
+
+class CMakeExtension(Extension):
+    def __init__(self, name, source_dir=_project_dir):
+        super(CMakeExtension, self).__init__(name, sources=[])
+        self.source_dir = os.path.abspath(source_dir)
+        self.build_type = 'Debug' if args.debug else 'Release'
+
+
+class CMakeBuild(build_ext):
+
+    def run(self):
+        try:
+            subprocess.check_output(['cmake', '--version'])
+        except OSError:
+            raise RuntimeError(
+                "CMake must be installed to build the following extensions: "
+                f"{', '.join(e.name for e in self.extensions)}"
+            )
+
+        for ext in self.extensions:
+            self.build_extension(ext)
+
+    def build_extension(self, ext) -> None:
+        original_full_path = self.get_ext_fullpath(ext.name)
+        ext_dir = os.path.abspath(os.path.dirname(original_full_path))
+        ext_dir = os.path.join(ext_dir, self.distribution.get_name())
+        cmake_args = [
+            f'-G', 'Ninja',
+            f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={ext_dir}',
+            f'-DPython3_ROOT_DIR={os.path.dirname(sys.executable)}',
+            f'-DCMAKE_BUILD_TYPE={ext.build_type}'
+        ]
+        build_temp = os.path.join(self.build_temp, ext.build_type)
+        if args.clean_before_build and os.path.exists(build_temp):
+            shutil.rmtree(build_temp)
+        os.makedirs(build_temp, exist_ok=True)
+        subprocess.check_call(
+            ['cmake', ext.source_dir] + cmake_args, cwd=build_temp, env=os.environ
+        )
+        subprocess.check_call(
+            ['cmake', '--build', '.', '--target', ext.name, '--', '-j', f'{os.cpu_count()}'], cwd=build_temp
+        )
+        subprocess.check_call(
+            ['cmake', '--build', '.', '--target', f'{ext.name}', '--', '-j', f'{os.cpu_count()}'], cwd=build_temp
+        )
 
 setup(
     name='bc_exploration',
@@ -18,13 +77,12 @@ setup(
     url='https://github.com/daizhirui/diff_info_gathering.git',
     download_url='',
     license='Braincorp',
-    install_requires=['numpy>=1.11.0',
-                      'matplotlib>=2.2.3',
-                      'opencv-python',
-                      'pyyaml==5.1'],
-    package_data={'': ['input']},
+    install_requires=[
+        'numpy==1.22.3', 'matplotlib', 'opencv-python', 'pyyaml'
+    ],
+    package_data={'': ['input', 'params/*'], 'bc_exploration.maps': ['test/*']},
     include_package_data=True,
-        extras_require={
+    extras_require={
         'tests': ['pytest==4.3.0',
                   'pytest-pep8==1.0.6',
                   'pytest-xdist==1.26.1',
@@ -41,20 +99,12 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.8',
         'Topic :: Software Development :: Libraries',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    packages=find_packages(),
-    ext_package='bc_exploration',
-    ext_modules=[Extension('_exploration_cpp',
-                           extra_compile_args=['-std=c++1y', '-O3', '-Wall', '-fpic'],
-                           include_dirs=['deps/pybind11/include',
-                                         'bc_exploration/cpp/inc'],
-                           sources=[
-                               'bc_exploration/cpp/src/exploration/astar.cpp',
-                               'bc_exploration/cpp/src/exploration/collision.cpp',
-                               'bc_exploration/cpp/src/exploration/util.cpp',
-                               'bc_exploration/cpp/src/exploration/python.cpp'
-                           ])]
+    packages=find_packages(os.path.join(_src_python_dir, '..')),
+    # ext_package='bc_exploration',
+    cmdclass=dict(build_ext=CMakeBuild),
+    ext_modules=[CMakeExtension('_exploration_cpp')]
 )

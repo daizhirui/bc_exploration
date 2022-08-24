@@ -155,7 +155,7 @@ def run_frontier_exploration(map_filename, params_filename, start_state, sensor_
                     footprint=footprint,
                     start_state=start_state)
 
-    render_size = (np.array(env.get_map_shape()[::-1]) * render_size_scale).astype(np.int)
+    render_size = (np.array(env.get_map_shape()[::-1]) * render_size_scale).astype(int)
 
     # setup log-odds mapper, we assume the measurements are very accurate,
     # thus one scan should be enough to fill the map
@@ -166,7 +166,7 @@ def run_frontier_exploration(map_filename, params_filename, start_state, sensor_
                           origin=[-padding - env.start_state[0], -padding - env.start_state[1]])
 
     clearing_footprint_points = footprint.get_clearing_points(map_resolution)
-    clearing_footprint_coords = xy_to_rc(clearing_footprint_points, initial_map).astype(np.int)
+    clearing_footprint_coords = xy_to_rc(clearing_footprint_points, initial_map).astype(int)
     initial_map.data[clearing_footprint_coords[:, 0], clearing_footprint_coords[:, 1]] = Costmap.FREE
 
     mapper = LogOddsMapper(initial_map=initial_map,
@@ -214,7 +214,7 @@ def run_frontier_exploration(map_filename, params_filename, start_state, sensor_
         for j, desired_state in enumerate(path):
             if footprint.check_for_collision(desired_state, occupancy_map, unexplored_is_occupied=True):
                 footprint_coords = footprint.get_ego_points(desired_state[2], map_resolution) + desired_state[:2]
-                footprint_coords = xy_to_rc(footprint_coords, occupancy_map).astype(np.int)
+                footprint_coords = xy_to_rc(footprint_coords, occupancy_map).astype(int)
                 footprint_coords = footprint_coords[which_coords_in_bounds(footprint_coords, occupancy_map.get_shape())]
                 occupancy_map.data[footprint_coords[:, 0], footprint_coords[:, 1]] = Costmap.FREE
 
@@ -223,7 +223,7 @@ def run_frontier_exploration(map_filename, params_filename, start_state, sensor_
 
             # put the current laserscan on the map before planning
             occupied_coords = scan_to_points(scan_angles + pose[2], scan_ranges) + pose[:2]
-            occupied_coords = xy_to_rc(occupied_coords, occupancy_map).astype(np.int)
+            occupied_coords = xy_to_rc(occupied_coords, occupancy_map).astype(int)
             occupied_coords = occupied_coords[which_coords_in_bounds(occupied_coords, occupancy_map.get_shape())]
             occupancy_map.data[occupied_coords[:, 0], occupied_coords[:, 1]] = Costmap.OCCUPIED
 

@@ -4,12 +4,13 @@ utilities for sensors, currently contains raytracing code
 from __future__ import print_function, absolute_import, division
 
 import numpy as np
+from skimage.draw import line as fast_bresenham2d
 
 
 def bresenham2d_with_intensities(p1, p2, img):
     """
     https://stackoverflow.com/questions/32328179/opencv-3-0-python-lineiterator
-    Produces and array that consists of the coordinates and intensities
+    Produces an array that consists of the coordinates and intensities
     of each pixel in a bresenham line between two points
     :param p1 array(2)[int]: the coordinate of the first point (x, y)
     :param p2 array(2)[int]: the coordinate of the second point (x, y)
@@ -26,56 +27,93 @@ def bresenham2d_with_intensities(p1, p2, img):
     p2_x = p2[0]
     p2_y = p2[1]
 
+    # line_fast = fast_bresenham2d(p1_x, p1_y, p2_x, p2_y)
     # difference and absolute difference between points
     # used to calculate slope and relative location between points
-    dx = p2_x - p1_x
-    dy = p2_y - p1_y
-    dx_abs = np.abs(dx)
-    dy_abs = np.abs(dy)
+    # dx = p2_x - p1_x
+    # dy = p2_y - p1_y
+    # dx_abs = np.abs(p2_x - p1_x)
+    # dy_abs = np.abs(p2_y - p1_y)
 
     # predefine numpy array for output based on distance between points
-    line = np.empty(shape=(np.maximum(dy_abs, dx_abs), 3), dtype=np.float32)
-    line.fill(np.nan)
+    # line = np.empty(shape=(max(dy_abs, dx_abs) + 1, 3), dtype=np.float32)
+    # line[:, 2].fill(np.nan)
 
-    # obtain coordinates along the line using a form of bresenham's algorithm
-    neg_y = p1_y > p2_y
-    neg_x = p1_x > p2_x
-    if p1_x == p2_x:  # vertical line segment
-        line[:, 0] = p1_x
-        if neg_y:
-            line[:, 1] = np.arange(p1_y - 1, p1_y - dy_abs - 1, -1)
-        else:
-            line[:, 1] = np.arange(p1_y + 1, p1_y + dy_abs + 1)
-    elif p1_y == p2_y:  # horizontal line segment
-        line[:, 1] = p1_y
-        if neg_x:
-            line[:, 0] = np.arange(p1_x - 1, p1_x - dx_abs - 1, -1)
-        else:
-            line[:, 0] = np.arange(p1_x + 1, p1_x + dx_abs + 1)
-    else:  # diagonal line segment
-        steep_slope = dy_abs > dx_abs
-        if steep_slope:
-            slope = dx.astype(np.float32) / dy.astype(np.float32)
-            if neg_y:
-                line[:, 1] = np.arange(p1_y - 1, p1_y - dy_abs - 1, -1)
-            else:
-                line[:, 1] = np.arange(p1_y + 1, p1_y + dy_abs + 1)
-            line[:, 0] = (slope * (line[:, 1] - p1_y)).astype(np.int) + p1_x
-        else:
-            slope = dy.astype(np.float32) / dx.astype(np.float32)
-            if neg_x:
-                line[:, 0] = np.arange(p1_x - 1, p1_x - dx_abs - 1, -1)
-            else:
-                line[:, 0] = np.arange(p1_x + 1, p1_x + dx_abs + 1)
-            line[:, 1] = (slope * (line[:, 0] - p1_x)).astype(np.int) + p1_y
+    tmp = fast_bresenham2d(p1_x, p1_y, p2_x, p2_y)
+    if (p1_x < 0) or (p1_y < 0) or (p1_x >= image_width) or (p1_y >= image_height) or \
+        (p2_x < 0) or (p2_y < 0) or (p2_x >= image_width) or (p2_y >= image_height):
+        mask = (tmp[0] >= 0) & (tmp[0] < image_width) & (tmp[1] >= 0) & (tmp[1] < image_height)
+        col_x = tmp[0][mask]
+        col_y = tmp[1][mask]
+    else:
+        col_x = tmp[0]
+        col_y = tmp[1]
+    intensity = img[col_y, col_x][:, np.newaxis].astype(np.float32)
+    line = np.hstack([
+        col_x[:, np.newaxis].astype(np.float32),
+        col_y[:, np.newaxis].astype(np.float32),
+        intensity
+    ])
+
+    # line = np.empty(shape=(max(dy_abs, dx_abs) + 1, 3), dtype=np.float32)
+    # line[:, 0] = tmp[0]
+    # line[:, 1] = tmp[1]
+
+    # # obtain coordinates along the line using a form of bresenham's algorithm
+    # neg_y = p1_y > p2_y
+    # neg_x = p1_x > p2_x
+    # if p1_x == p2_x:  # vertical line segment
+    #     line[:, 0] = p1_x
+    #     if neg_y:
+    #         line[:, 1] = np.arange(p1_y - 1, p1_y - dy_abs - 1, -1)
+    #     else:
+    #         line[:, 1] = np.arange(p1_y + 1, p1_y + dy_abs + 1)
+    # elif p1_y == p2_y:  # horizontal line segment
+    #     line[:, 1] = p1_y
+    #     if neg_x:
+    #         line[:, 0] = np.arange(p1_x - 1, p1_x - dx_abs - 1, -1)
+    #     else:
+    #         line[:, 0] = np.arange(p1_x + 1, p1_x + dx_abs + 1)
+    # else:  # diagonal line segment
+    #     steep_slope = dy_abs > dx_abs
+    #     if steep_slope:
+    #         slope = dx.astype(np.float32) / dy.astype(np.float32)
+    #         if neg_y:
+    #             line[:, 1] = np.arange(p1_y - 1, p1_y - dy_abs - 1, -1)
+    #         else:
+    #             line[:, 1] = np.arange(p1_y + 1, p1_y + dy_abs + 1)
+    #         line[:, 0] = (slope * (line[:, 1] - p1_y)).astype(int) + p1_x
+    #     else:
+    #         slope = dy.astype(np.float32) / dx.astype(np.float32)
+    #         if neg_x:
+    #             line[:, 0] = np.arange(p1_x - 1, p1_x - dx_abs - 1, -1)
+    #         else:
+    #             line[:, 0] = np.arange(p1_x + 1, p1_x + dx_abs + 1)
+    #         line[:, 1] = (slope * (line[:, 0] - p1_x)).astype(int) + p1_y
 
     # remove points outside of image
-    col_x = line[:, 0]
-    col_y = line[:, 1]
-    line = line[(col_x >= 0) & (col_y >= 0) & (col_x < image_width) & (col_y < image_height)]
+    # col_x = line[:, 0]
+    # col_y = line[:, 1]
+    # line = line[(col_x >= 0) & (col_y >= 0) & (col_x < image_width) & (col_y < image_height)]
 
     # get intensities from img ndarray
-    line[:, 2] = img[line[:, 1].astype(np.uint), line[:, 0].astype(np.uint)]
+    # line[:, 2] = img[line[:, 1].astype(np.uint), line[:, 0].astype(np.uint)]
+
+    return line
+
+
+def bresenham2d_within_image(p1, p2, image_height, image_width):
+    p1_x = p1[0]
+    p1_y = p1[1]
+    p2_x = p2[0]
+    p2_y = p2[1]
+
+    tmp = fast_bresenham2d(p1_x, p1_y, p2_x, p2_y)
+    line = np.hstack([tmp[0][:, np.newaxis], tmp[1][:, np.newaxis]]).astype(np.float32)
+    if (p1_x < 0) or (p1_y < 0) or (p1_x >= image_width) or (p1_y >= image_height) or \
+       (p2_x < 0) or (p2_y < 0) or (p2_x >= image_width) or (p2_y >= image_height):
+        mask = (tmp[0] >= 0) & (tmp[0] < image_width) & (tmp[1] >= 0) & (tmp[1] < image_height)
+        return line[mask, :]
 
     return line
 
@@ -128,3 +166,4 @@ def bresenham2d(p0, p1):
         else:
             y = y0 - np.cumsum(q)
     return np.vstack((x, y)).T
+

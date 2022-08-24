@@ -1,364 +1,399 @@
-#include "exploration/astar.h"
-#include "exploration/util.h"
+#include "exploration/astar.hpp"
+#include "exploration/util.hpp"
+#include <queue>
+#include <stack>
 
-bool operator>(const Node &n1, const Node &n2) {
-  return n1.f > n2.f;
-}
 
-PlanningResult astar(pybind11::safe_array<int, 1> start,
-                     pybind11::safe_array<int, 1> goal,
-                     pybind11::safe_array<uint8_t, 2> occupancy_map,
-                     pybind11::safe_array<uint8_t, 1> obstacle_values,
-                     float delta,
-                     float epsilon,
-                     int planning_scale,
-                     bool allow_diagonal) {
-  /* A* algorithm
-   *
-   * :param start array(2)[int32]: start coordinate [row, column]
-   * :param goal array(2)[int32]: goal coordinate [row, column]
-   * :param occupancy_map array(N, M)[uint8]: 2d occupancy map
-   * :param obstacle_values array(N)[uint8]: values in the occupancy map we consider to be obstacles
-   * :param delta float: distance (in pixels) of which we define around the goal coordinate, to consider as the goal
-   *                     if it is 0, we look to plan exactly to the goal coord, if its > 0 then we define the goal region
-   *                     to be that many pixels bigger
-   * :param epsilon float: weighting for the heuristic in the A* algorithm
-   * :param planning_scale int: value > 1, to plan on a lower resolution than the original occupancy map resolution,
-   *                            this value is round_int(desired resolution / original resolution)
-   * :param allow_diagonal bool: whether to allow diagonal movements
-   * :return Tuple[bool, array(N, 2)[int32]]: is_successful - whether the goal pose was reached,
-   *                                          path_px - array of coordinates for the most promising path if not successful
-   *                                                    otherwise it is the path to the goal.
-   */
-  std::cout << "start plan, ";
-
-  // verify planning scale is correct
-  if (planning_scale < 1) {
-    throw std::logic_error("ERROR: parameter planning_scale of c++ function oriented_astar() must be greater than 1 ");
-  }
-
-  const float inf = std::numeric_limits<float>::infinity();
-
-  int map_shape[2] = {(int) occupancy_map.shape()[0] , (int) occupancy_map.shape()[1]};
-  const int start_idx = index_2d_to_1d(&start(0), map_shape);
-
-  for(int i = 0; i < obstacle_values.shape()[0]; i++){
-    if (occupancy_map(start(0), start(1)) == obstacle_values[i] || occupancy_map(goal(0), goal(1)) == obstacle_values[i]) {
-      return std::make_tuple(false, pybind11::safe_array<int, 2>());
-    }
-  }
-
-  Node start_node = Node(0.0, start_idx);
-
-  std::priority_queue<Node, std::vector<Node>, std::greater<> > open_set;
-  open_set.push(start_node);
-
-  std::vector<float> costs((ulong) map_shape[0]*map_shape[1]);
-  for (int i = 0; i < map_shape[0]*map_shape[1]; i++) {
-    costs[i] = inf;
-  }
-  costs[start_idx] = 0.0;
-
-  std::vector<int> paths((ulong) map_shape[0]*map_shape[1]);
-  for (int i = 0; i < map_shape[0]*map_shape[1]; i++) {
-    paths[i] = -1;
-  }
-
-  int children[8][2];
-  int parent_coord[2];
-  int solution_idx = -1;
-
-  int num_nodes_expanded = 0;
-  bool is_successful = false;
-  while(!open_set.empty()) {
-    Node parent = open_set.top();
-    open_set.pop();
-
-    index_1d_to_2d(parent.idx, map_shape, parent_coord);
-
-    // todo planning_scale + delta isnt quite right, maybe max(planning_scale, delta) is correct
-    float distance_to_goal = euclidean(parent_coord, &goal(0));
-    if (distance_to_goal <= delta || (planning_scale != 1 && distance_to_goal <= planning_scale + delta)) {
-      is_successful = true;
-      solution_idx = parent.idx;
-      break;
+namespace exploration {
+    bool
+    Node::operator>(const exploration::Node &other) const {
+        return f > other.f;
     }
 
-    children[0][0] = parent_coord[0];                  children[0][1] = parent_coord[1] - planning_scale;
-    children[1][0] = parent_coord[0] + planning_scale; children[1][1] = parent_coord[1] - planning_scale;
-    children[2][0] = parent_coord[0] + planning_scale; children[2][1] = parent_coord[1];
-    children[3][0] = parent_coord[0] + planning_scale; children[3][1] = parent_coord[1] + planning_scale;
-    children[4][0] = parent_coord[0];                  children[4][1] = parent_coord[1] + planning_scale;
-    children[5][0] = parent_coord[0] - planning_scale; children[5][1] = parent_coord[1] + planning_scale;
-    children[6][0] = parent_coord[0] - planning_scale; children[6][1] = parent_coord[1];
-    children[7][0] = parent_coord[0] - planning_scale; children[7][1] = parent_coord[1] - planning_scale;
+    std::pair<bool, Eigen::MatrixX2i>
+    astar(
+        const Eigen::Ref<const Eigen::Vector2i> &start,
+        const Eigen::Ref<const Eigen::Vector2i> &goal,
+        const Eigen::Ref<const Eigen::MatrixX<uint8_t>> &occupancyMap,
+        const Eigen::Ref<const Eigen::VectorX<uint8_t>> &obstacleValues,
+        float delta,
+        float epsilon,
+        int planningScale,
+        bool allowDiagonal) {
 
-    for (int c = 0; c < 8; c++) {
-      // if diagonal is not allowed, skip those children
-      if (!allow_diagonal && c % 2 != 0) {
-            continue;
-      }
+        std::cout << "start plan, ";
 
-      // skip child if out of bounds
-      if (children[c][0] < 0 || children[c][0] >= map_shape[0] \
-              || children[c][1] < 0 || children[c][1] >= map_shape[1]) {
-        continue;
-      }
+        // verify planning scale is correct
+        if (planningScale < 1) { throw std::logic_error("ERROR: parameter planningScale of c++ function oriented_astar() must be greater than 1 "); }
 
-      // skip child if it lies on an obstacle
-      bool on_obstacle = false;
-      for(int i = 0; i < obstacle_values.shape()[0]; i++) {
-        if (occupancy_map(children[c][0], children[c][1]) == obstacle_values[i]) {
-          on_obstacle = true;
+        const float inf = std::numeric_limits<float>::infinity();
+
+        int mapShape[2] = {(int) occupancyMap.rows(), (int) occupancyMap.cols()};
+        int numCells = (int) occupancyMap.size();
+        const int startIdx = index2dTo1d(start.coeffRef(0), start.coeffRef(1), mapShape[1]);
+
+        for (int i = 0; i < obstacleValues.size(); i++) {
+            if (occupancyMap.coeffRef(start.coeffRef(0), start.coeffRef(1)) == obstacleValues.coeffRef(i) ||
+                occupancyMap.coeffRef(goal.coeffRef(0), goal.coeffRef(1)) == obstacleValues.coeffRef(i)) {
+                return std::make_pair(false, Eigen::MatrixXi(0, 2));
+            }
         }
-      }
 
-      if (on_obstacle) {
-        continue;
-      }
+        Node startNode = Node(0.0, startIdx);
 
-      float g = costs[parent.idx] + euclidean(parent_coord, children[c]);
+        std::priority_queue<Node, std::vector<Node>, std::greater<>> openSet;
+        openSet.push(startNode);
 
-      int child_idx = index_2d_to_1d(children[c], map_shape);
-      if (costs[child_idx] > g) {
-        costs[child_idx] = g;
-        paths[child_idx] = parent.idx;
+        std::vector<float> costs(numCells, inf);
+        costs[startIdx] = 0.0;
 
-        float f = g + epsilon * euclidean(children[c], &goal(0));
-        open_set.push(Node(f, child_idx));
-      }
-    }
-    num_nodes_expanded++;
-  }
+        std::vector<int> paths(numCells, -1);
 
-  int current_idx = solution_idx;
-  std::stack<int> path_stack;
-  while(start_idx != current_idx) {
-    path_stack.push(current_idx);
-    current_idx = paths[current_idx];
-  }
+        int children[8][2];
+        int parentCoord[2];
+        int solutionIdx = -1;
 
-  auto path_px = pybind11::zeros<int>(path_stack.size(), 2);
+        int numNodesExpanded = 0;
+        bool isSuccessful = false;
+        while (!openSet.empty()) {
+            Node parent = openSet.top();
+            openSet.pop();
 
-  int i = 0;
-  int coord[2];
-  while(!path_stack.empty()) {
-    int idx = path_stack.top();
-    index_1d_to_2d(idx, map_shape, coord);
-    path_px(i, 0) = coord[0];
-    path_px(i, 1) = coord[1];
-    path_stack.pop();
-    i++;
-  }
+            index1dTo2d(parent.idx, mapShape[1], parentCoord[0], parentCoord[1]);
 
-  std::cout << "expanded " << num_nodes_expanded << " nodes. successful: " << is_successful << std::endl;
-  return std::make_tuple(is_successful, path_px);
-}
+            // todo planningScale + delta is not quite right, maybe max(planningScale, delta) is correct
+            float distance_to_goal = euclidean(parentCoord[0], parentCoord[1], goal.x(), goal.y());
+            if (distance_to_goal <= delta || (planningScale != 1 && distance_to_goal <= float(planningScale) + delta)) {
+                isSuccessful = true;
+                solutionIdx = parent.idx;
+                break;
+            }
 
+            children[0][0] = parentCoord[0];
+            children[0][1] = parentCoord[1] - planningScale;
+            children[1][0] = parentCoord[0] + planningScale;
+            children[1][1] = parentCoord[1] - planningScale;
+            children[2][0] = parentCoord[0] + planningScale;
+            children[2][1] = parentCoord[1];
+            children[3][0] = parentCoord[0] + planningScale;
+            children[3][1] = parentCoord[1] + planningScale;
+            children[4][0] = parentCoord[0];
+            children[4][1] = parentCoord[1] + planningScale;
+            children[5][0] = parentCoord[0] - planningScale;
+            children[5][1] = parentCoord[1] + planningScale;
+            children[6][0] = parentCoord[0] - planningScale;
+            children[6][1] = parentCoord[1];
+            children[7][0] = parentCoord[0] - planningScale;
+            children[7][1] = parentCoord[1] - planningScale;
 
-std::vector<float> get_astar_angles() {
-  // these angles correspond to the x,y world converted
-  // angles of moving in the corresponding
-  // children direction in the astar algorithm
-  // see astar assignment of children.
-  std::vector<float> angles(8);
-  angles[0] = (float) -M_PI;
-  angles[1] = (float) (-3.*M_PI_4);
-  angles[2] = (float) -M_PI_2;
-  angles[3] = (float) -M_PI_4;
-  angles[4] = (float) 0.;
-  angles[5] = (float) M_PI_4;
-  angles[6] = (float) M_PI_2;
-  angles[7] = (float) (3.*M_PI_4);
-  return angles;
-}
+            for (int c = 0; c < 8; c++) {
+                // if diagonal is not allowed, skip those children
+                if (!allowDiagonal && c % 2 != 0) { continue; }
 
+                // skip child if out of bounds
+                if (children[c][0] < 0 || children[c][0] >= mapShape[0] || children[c][1] < 0 || children[c][1] >= mapShape[1]) { continue; }
 
-OrientedPlanningResult oriented_astar(pybind11::safe_array<int, 1> start,
-                                      pybind11::safe_array<int, 1> goal,
-                                      pybind11::safe_array<uint8_t, 2> occupancy_map,
-                                      std::vector<pybind11::safe_array_mut<bool, 2> > footprint_masks,
-                                      pybind11::safe_array<float, 1> mask_angles,
-                                      std::vector<pybind11::safe_array_mut<int, 2> > outline_coords,
-                                      pybind11::safe_array<uint8_t, 1> obstacle_values,
-                                      const float delta,
-                                      const float epsilon,
-                                      const int planning_scale,
-                                      const bool allow_diagonal) {
-  /* Oriented A* algorithm, does not plan on angular space, rather has assigned angles for each movement direction.
-   *
-   * :param start array(2)[float32]: start coordinate [row, column]
-   * :param goal array(2)[float32]: goal coordinate [row, column]
-   * :param occupancy_map array(N, M)[uint8]: 2d occupancy map
-   * :param footprint_masks List[array(U, U)]: U is the size of a UxU mask for checking footprint collision,
-   *                                           where U must be odd, such that U / 2 + 1 is the center pixel,
-   *                                           the mask is true for footprint and false for not footprint,
-   *                                           which is centered among the center pixel in the mask.
-   *                                           Each mask in the list corresponds to a footprint mask for each angle
-   *                                           defined in mask_angles.
-   * :param mask_angles array(8)[float32]: 1x8 array of these angles (in order)
-   *                                       [-pi, -3pi/4, -pi/2, -pi/4, 0, pi/4, pi/2, 3pi/4]
-   *                                       can use the get_astar_angles() function to get these angles.
-   * :param outline_coords array(N, 2)[int32]: coordinates corresponding to the outline of the footprint in ego coordinates
-   *                                           used for quick checking of out of bounds / collisions
-   * :param obstacle_values array(N)[uint8]: values in the occupancy map we consider to be obstacles
-   * :param delta float: distance (in pixels) of which we define around the goal coordinate, to consider as the goal
-   *                     if it is 0, we look to plan exactly to the goal coord, if its > 0 then we define the goal region
-   *                     to be that many pixels bigger
-   * :param epsilon float: weighting for the heuristic in the A* algorithm
-   * :param planning_scale int: value > 1, to plan on a lower resolution than the original occupancy map resolution,
-   *                       this value is round_int(desired resolution / original resolution)
-   * :param allow_diagonal bool: whether to allow diagonal movements
-   * :return Tuple[bool, array(N, 2)[int32]]: is_successful - whether the goal pose was reached,
-   *                                          path_px - array of coordinates for the most promising path if not successful
-   *                                                    otherwise it is the path to the goal.
-   */
+                // skip child if it lies on an obstacle
+                bool onObstacle = false;
+                for (int i = 0; i < obstacleValues.size(); i++) {
+                    if (occupancyMap.coeffRef(children[c][0], children[c][1]) == obstacleValues.coeffRef(i)) { onObstacle = true; }
+                }
 
-  std::cout << "start plan, ";
+                if (onObstacle) { continue; }
 
-  // todo: we arent going to goal angle.. we need to make sure we collision check it if we want to.
-  const float inf = std::numeric_limits<float>::infinity();
+                float g = costs[parent.idx] + euclidean(parentCoord[0], parentCoord[1], children[c][0], children[c][1]);
 
-  // verify angles are correct (i.e human knows what he is doing when he calls this function)
-  std::vector<float> correct_angles = get_astar_angles();
-  for (int i = 0; i < 8; i++) {
-    if (correct_angles[i] != mask_angles[i]) {
-      throw std::logic_error("ERROR: parameter mask_angles of c++ function oriented_astar() does not match required angles. "
-                             "See get_astar_angles() for the correct angles/order. "
-                             "Note, the footprint masks must match these angles, or you will get undesired behavior!");
-    }
-  }
+                int childIdx = index2dTo1d(children[c][0], children[c][1], mapShape[1]);
+                if (costs[childIdx] > g) {
+                    costs[childIdx] = g;
+                    paths[childIdx] = parent.idx;
 
-  // verify planning scale is correct
-  if (planning_scale < 1) {
-    throw std::logic_error("ERROR: parameter planning_scale of c++ function oriented_astar() must be greater than 1 ");
-  }
+                    float f = g + epsilon * euclidean(children[c][0], children[c][1], goal.x(), goal.y());
+                    openSet.push(Node(f, childIdx));
+                }
+            }
+            numNodesExpanded++;
+        }
 
-  int map_shape[2] = {(int) occupancy_map.shape()[0] , (int) occupancy_map.shape()[1]};
-  const int start_idx = index_2d_to_1d(&start(0), map_shape);
+        int currentIdx = solutionIdx;
+        std::stack<int> pathStack;
+        while (startIdx != currentIdx) {
+            pathStack.push(currentIdx);
+            currentIdx = paths[currentIdx];
+        }
 
-  Node start_node = Node(0.0, start_idx);
+        // auto path_px = py::ndarray<int>(py::array::ShapeContainer{(ssize_t) pathStack.size(), (ssize_t) 2});
+        Eigen::MatrixX2i pathPX = Eigen::MatrixX2i(pathStack.size(), 2);
 
-  std::priority_queue<Node, std::vector<Node>, std::greater<> > open_set;
-  open_set.push(start_node);
+        int i = 0;
+        int coord[2];
+        while (!pathStack.empty()) {
+            int idx = pathStack.top();
+            index1dTo2d(idx, mapShape[1], coord[0], coord[1]);
+            pathPX.row(i) << coord[0], coord[1];
+            pathStack.pop();
+            i++;
+        }
 
-  std::vector<float> costs((ulong) map_shape[0]*map_shape[1]);
-  for (int i = 0; i < map_shape[0]*map_shape[1]; i++) {
-    costs[i] = inf;
-  }
-  costs[start_idx] = 0.0;
-
-  std::vector<int> paths((ulong) map_shape[0]*map_shape[1]);
-  for (int i = 0; i < map_shape[0]*map_shape[1]; i++) {
-    paths[i] = -1;
-  }
-
-  std::vector<int> paths_angle_inds((ulong) map_shape[0]*map_shape[1]);
-  for (int i = 0; i < map_shape[0]*map_shape[1]; i++) {
-    paths_angle_inds[i] = -1;
-  }
-
-  int children[8][2];
-  int parent_coord[2];
-
-  int solution_idx = -1;
-  float closest_distance_to_goal = inf;
-
-  int num_nodes_expanded = 0;
-  bool is_successful = false;
-  while(!open_set.empty()) {
-    Node parent = open_set.top();
-    open_set.pop();
-
-    index_1d_to_2d(parent.idx, map_shape, parent_coord);
-
-    float distance_to_goal = euclidean(parent_coord, &goal(0));
-
-    if (distance_to_goal < closest_distance_to_goal) {
-      closest_distance_to_goal = distance_to_goal;
-      solution_idx = parent.idx;
+        std::cout << "expanded " << numNodesExpanded << " nodes. successful: " << isSuccessful << std::endl;
+        return std::make_pair(isSuccessful, pathPX);
     }
 
-    // todo planning_scale + delta isnt quite right, maybe max(planning_scale, delta) is correct
-    if (distance_to_goal <= delta || (planning_scale != 1 && distance_to_goal <= planning_scale + delta)) {
-      is_successful = true;
-      solution_idx = parent.idx;
-      break;
+
+    inline std::vector<float>
+    getAstarAngles() {
+        // these angles correspond to the x,y world converted
+        // angles of moving in the corresponding
+        // children direction in the astar algorithm
+        // see astar assignment of children.
+        return {-M_PI, -3. * M_PI_4, -M_PI_2, -M_PI_4, 0., M_PI_4, M_PI_2, 3. * M_PI_4};
     }
 
-    // todo Note that if planning_scale is too large, in theory this will cause us to jump over thin obstacles.
-    // todo In reality, this will never happen, since we won't be planning on a large enough resolutions.
-    // todo can I somehow efficiently check the line between the pose and the neighbor to make sure the move is valid?
-    children[0][0] = parent_coord[0];                  children[0][1] = parent_coord[1] - planning_scale;
-    children[1][0] = parent_coord[0] + planning_scale; children[1][1] = parent_coord[1] - planning_scale;
-    children[2][0] = parent_coord[0] + planning_scale; children[2][1] = parent_coord[1];
-    children[3][0] = parent_coord[0] + planning_scale; children[3][1] = parent_coord[1] + planning_scale;
-    children[4][0] = parent_coord[0];                  children[4][1] = parent_coord[1] + planning_scale;
-    children[5][0] = parent_coord[0] - planning_scale; children[5][1] = parent_coord[1] + planning_scale;
-    children[6][0] = parent_coord[0] - planning_scale; children[6][1] = parent_coord[1];
-    children[7][0] = parent_coord[0] - planning_scale; children[7][1] = parent_coord[1] - planning_scale;
+    std::pair<bool, Eigen::MatrixX3f>
+    orientedAstar(
+        const Eigen::Ref<const Eigen::Vector2i> &start,
+        const Eigen::Ref<const Eigen::Vector2i> &goal,
+        const Eigen::Ref<const Eigen::MatrixX<uint8_t>> &occupancyMap,
+        const std::vector<Eigen::Ref<const Eigen::MatrixX<bool>>> &footprintMasks,
+        const Eigen::Ref<const Eigen::VectorXf> &maskAngles,
+        const std::vector<Eigen::Ref<const Eigen::MatrixX<int>>> &outlineCoords,
+        const Eigen::Ref<const Eigen::VectorX<uint8_t>> &obstacleValues,
+        float delta,
+        float epsilon,
+        int planningScale,
+        bool allowDiagonal,
+        std::ostream &ostream) {
 
-    for (int c = 0; c < 8; c++) {
-      // if diagonal is not allowed, skip those children
-      if (!allow_diagonal && c % 2 != 0) {
-        continue;
-      }
+        ostream << "start plan, (" << start.coeffRef(0) << ", " << start.coeffRef(1) << ") -> (" << goal.coeffRef(0) << ", " << goal.coeffRef(1) << "), ";
 
-      // skip child if out of bounds
-      if (children[c][0] < 0 || children[c][0] >= map_shape[0] \
-          || children[c][1] < 0 || children[c][1] >= map_shape[1]) {
-        continue;
-      }
+        // todo: we arent going to goal angle.. we need to make sure we collision check it if we want to.
+        const float inf = std::numeric_limits<float>::infinity();
 
-      auto child = pybind11::zeros<int>(2);
-      child(0) = children[c][0]; child(1) = children[c][1];
+        // verify angles are correct (i.e human knows what he is doing when he calls this function)
+        std::vector<float> correct_angles = getAstarAngles();
+        for (int i = 0; i < 8; i++) {
+            if (correct_angles[i] != maskAngles.coeffRef(i)) {
+                throw std::logic_error("ERROR: parameter maskAngles of c++ function oriented_astar() does not match required angles. "
+                                       "See get_astar_angles() for the correct angles/order. "
+                                       "Note, the footprint masks must match these angles, or you will get undesired behavior!");
+            }
+        }
 
-      if (check_for_collision(child,
-                              occupancy_map,
-                              footprint_masks[c],
-                              outline_coords[c],
-                              obstacle_values)) {
-        continue;
-      }
+        // verify planning scale is correct
+        if (planningScale < 1) { throw std::logic_error("ERROR: parameter planningScale of c++ function oriented_astar() must be greater than 1 "); }
 
-      float g = costs[parent.idx] + euclidean(parent_coord, children[c]);
+        // check if goal is reachable
+        for (int k = 0; k < obstacleValues.size(); k++) {
+            if (occupancyMap.coeffRef(goal.coeffRef(0), goal.coeffRef(1)) == obstacleValues.coeffRef(k)) {
+                ostream << "[WARN] goal is obstacle, ";
+                break;
+            }
+        }
 
-      int child_idx = index_2d_to_1d(children[c], map_shape);
-      if (costs[child_idx] > g) {
-        costs[child_idx] = g;
-        paths[child_idx] = parent.idx;
-        paths_angle_inds[child_idx] = c;
+        int mapShape[2] = {(int) occupancyMap.rows(), (int) occupancyMap.cols()};
+        const int startIdx = index2dTo1d(start.coeffRef(0), start.coeffRef(1), mapShape[1]);
 
-        float f = g + epsilon * euclidean(children[c], &goal(0));
-        open_set.push(Node(f, child_idx));
-      }
+        Node startNode = Node(0.0, startIdx);
+
+        std::priority_queue<Node, std::vector<Node>, std::greater<>> openSet;
+        openSet.push(startNode);
+
+        std::vector<float> costs(occupancyMap.size(), inf);
+        // std::vector<float> costs((ulong) mapShape[0] * mapShape[1]);
+        // for (int i = 0; i < mapShape[0] * mapShape[1]; i++) { costs[i] = inf; }
+        costs[startIdx] = 0.0;
+
+        std::vector<int> paths(occupancyMap.size(), -1);
+        // std::vector<int> paths((ulong) mapShape[0] * mapShape[1]);
+        // for (int i = 0; i < mapShape[0] * mapShape[1]; i++) { paths[i] = -1; }
+
+        std::vector<int> pathsAngleInds(occupancyMap.size(), -1);
+        // std::vector<int> paths_angle_inds((ulong) mapShape[0] * mapShape[1]);
+        // for (int i = 0; i < mapShape[0] * mapShape[1]; i++) { paths_angle_inds[i] = -1; }
+
+        int children[8][2];
+        int parentCoord[2];
+
+        int solutionIdx = -1;
+        float closestDistanceToGoal = inf;
+
+        int numNodesExpanded = 0;
+        bool isSuccessful = false;
+        while (!openSet.empty()) {
+            Node parent = openSet.top();
+            openSet.pop();
+
+            index1dTo2d(parent.idx, mapShape[1], parentCoord[0], parentCoord[1]);
+
+            float distanceToGoal = euclidean(parentCoord[0], parentCoord[1], goal.x(), goal.y());
+
+            if (distanceToGoal < closestDistanceToGoal) {
+                closestDistanceToGoal = distanceToGoal;
+                solutionIdx = parent.idx;
+            }
+
+            // todo planningScale + delta isnt quite right, maybe max(planningScale, delta) is correct
+            if (distanceToGoal <= delta || (planningScale != 1 && distanceToGoal <= std::max(float(planningScale), delta))) {
+                isSuccessful = true;
+                solutionIdx = parent.idx;
+                break;
+            }
+
+            // todo Note that if planningScale is too large, in theory this will cause us to jump over thin obstacles.
+            // todo In reality, this will never happen, since we won't be planning on a large enough resolutions.
+            // todo can I somehow efficiently check the line between the pose and the neighbor to make sure the move is valid?
+            children[0][0] = parentCoord[0];
+            children[0][1] = parentCoord[1] - planningScale;
+            children[1][0] = parentCoord[0] + planningScale;
+            children[1][1] = parentCoord[1] - planningScale;
+            children[2][0] = parentCoord[0] + planningScale;
+            children[2][1] = parentCoord[1];
+            children[3][0] = parentCoord[0] + planningScale;
+            children[3][1] = parentCoord[1] + planningScale;
+            children[4][0] = parentCoord[0];
+            children[4][1] = parentCoord[1] + planningScale;
+            children[5][0] = parentCoord[0] - planningScale;
+            children[5][1] = parentCoord[1] + planningScale;
+            children[6][0] = parentCoord[0] - planningScale;
+            children[6][1] = parentCoord[1];
+            children[7][0] = parentCoord[0] - planningScale;
+            children[7][1] = parentCoord[1] - planningScale;
+
+            for (int c = 0; c < 8; c++) {
+                // if diagonal is not allowed, skip those children
+                if (!allowDiagonal && c % 2 != 0) { continue; }
+
+                // skip child if out of bounds
+                if (children[c][0] < 0 || children[c][0] >= mapShape[0] || children[c][1] < 0 || children[c][1] >= mapShape[1]) { continue; }
+
+                // auto child = py::ndarray<int>(py::array::ShapeContainer{2});
+                Eigen::Map<Eigen::Vector2i> child = Eigen::Map<Eigen::Vector2i>(children[c]);
+                // child.mutable_at(0) = children[c][0];
+                // child.mutable_at(1) = children[c][1];
+
+                if (checkForCollision(child, occupancyMap, footprintMasks[c], outlineCoords[c], obstacleValues)) { continue; }
+
+                float g = costs[parent.idx] + euclidean(parentCoord[0], parentCoord[1], children[c][0], children[c][1]);
+
+                int childIdx = index2dTo1d(child.x(), child.y(), mapShape[1]);
+                if (costs[childIdx] > g) {
+                    costs[childIdx] = g;
+                    paths[childIdx] = parent.idx;
+                    pathsAngleInds[childIdx] = c;
+
+                    float f = g + epsilon * euclidean(children[c][0], children[c][1], goal.x(), goal.y());
+                    openSet.push(Node(f, childIdx));
+                }
+            }
+            numNodesExpanded++;
+        }
+
+        int currentIdx = solutionIdx;
+        float currentAngle = maskAngles.coeffRef(pathsAngleInds[currentIdx]);
+        std::stack<std::pair<int, float>> pathStack;
+        while (startIdx != currentIdx) {
+            pathStack.push(std::make_pair(currentIdx, currentAngle));
+            currentIdx = paths[currentIdx];
+            currentAngle = maskAngles.coeffRef(pathsAngleInds[currentIdx]);
+        }
+
+        // auto path_px = py::ndarray<float>(py::array::ShapeContainer{(ssize_t) pathStack.size(), (ssize_t) 3});
+        auto pathPX = Eigen::MatrixX3f(pathStack.size(), 3);
+        int i = 0;
+        int coord[2];
+        while (!pathStack.empty()) {
+            std::pair<int, float> item = pathStack.top();
+            index1dTo2d(item.first, mapShape[1], coord[0], coord[1]);
+            pathPX.row(i) << float(coord[0]), float(coord[1]), item.second;
+            pathStack.pop();
+            i++;
+        }
+
+        auto n = pathPX.rows();
+        ostream << "expanded " << numNodesExpanded << " nodes, path (" << pathPX.coeffRef(0, 0) << ", " << pathPX.coeffRef(0, 1) << ") -> ("
+                << pathPX.coeffRef(n - 1, 0) << ", " << pathPX.coeffRef(n - 1, 1) << "), length: " << n << ", successful: " << isSuccessful << std::endl;
+        return std::make_pair(isSuccessful, pathPX);
     }
-    num_nodes_expanded++;
-  }
 
-  int current_idx = solution_idx;
-  float current_angle = mask_angles[paths_angle_inds[current_idx]];
-  std::stack<std::pair<int, float> > path_stack;
-  while(start_idx != current_idx) {
-    path_stack.push(std::make_pair(current_idx, current_angle));
-    current_idx = paths[current_idx];
-    current_angle = mask_angles[paths_angle_inds[current_idx]];
-  }
+    std::vector<std::pair<bool, Eigen::MatrixX3f>>
+    orientedAstarMultiGoals(
+        const Eigen::Ref<const Eigen::Vector2i> &start,
+        const Eigen::Ref<const Eigen::MatrixX2i> &goals,
+        const Eigen::Ref<const Eigen::MatrixX<uint8_t>> &occupancyMap,
+        const std::vector<Eigen::Ref<const Eigen::MatrixX<bool>>> &footprintMasks,
+        const Eigen::Ref<const Eigen::VectorXf> &maskAngles,
+        const std::vector<Eigen::Ref<const Eigen::MatrixX<int>>> &outlineCoords,
+        const Eigen::Ref<const Eigen::VectorX<uint8_t>> &obstacleValues,
+        float delta,
+        float epsilon,
+        int planningScale,
+        bool allowDiagonal,
+        bool parallel) {
 
-  auto path_px = pybind11::zeros<float>(path_stack.size(), 3);
+        // int cnt = 0;
+        // py::assert_ndarray_dims<1>(start);
+        // py::assert_ndarray_dims<2>(goals);
+        // py::assert_ndarray_dims<2>(occupancy_map);
+        // for (auto &footprint_mask: footprint_masks) { py::assert_ndarray_dims<2>(footprint_mask); }
+        // py::assert_ndarray_dims<1>(mask_angles);
+        // for (auto &outline_coord: outline_coords) { py::assert_ndarray_dims<2>(outline_coord); }
+        // py::assert_ndarray_dims<1>(obstacle_values);
 
-  int i = 0;
-  int coord[2];
-  while(!path_stack.empty()) {
-    std::pair<int, float> item = path_stack.top();
-    index_1d_to_2d(item.first, map_shape, coord);
-    path_px(i, 0) = coord[0];
-    path_px(i, 1) = coord[1];
-    path_px(i, 2) = item.second;
-    path_stack.pop();
-    i++;
-  }
+        std::vector<std::pair<bool, Eigen::MatrixX3f>> out(goals.rows());
+        std::vector<std::pair<bool, std::string>> threadErrorMessages(goals.rows());
+        std::vector<std::stringstream> threadLogStreams(goals.rows());
 
-  std::cout << "expanded " << num_nodes_expanded << " nodes. successful: " << is_successful << std::endl;
-  return std::make_tuple(is_successful, path_px);
-}
+        std::cout << "shape of goals: (" << goals.rows() << ", " << goals.cols() << ")" << std::endl;
+
+#pragma omp parallel for if (parallel) default(none) shared(                                                                                                   \
+    out,                                                                                                                                                       \
+    threadErrorMessages,                                                                                                                                       \
+    threadLogStreams,                                                                                                                                          \
+    start,                                                                                                                                                     \
+    goals,                                                                                                                                                     \
+    occupancyMap,                                                                                                                                              \
+    footprintMasks,                                                                                                                                            \
+    maskAngles,                                                                                                                                                \
+    outlineCoords,                                                                                                                                             \
+    obstacleValues,                                                                                                                                            \
+    delta,                                                                                                                                                     \
+    epsilon,                                                                                                                                                   \
+    planningScale,                                                                                                                                             \
+    allowDiagonal)
+        for (int i = 0; i < goals.rows(); ++i) {
+            auto &goal = goals.row(i).transpose();
+            threadErrorMessages[i].first = false;
+            // auto goal = py::ndarray<int>(py::array::ShapeContainer{2});
+            // goal.mutable_at(0) = goals.at(i, 0);
+            // goal.mutable_at(1) = goals.at(i, 1);
+            try {
+                out[i] = orientedAstar(
+                    start,
+                    goal,
+                    occupancyMap,
+                    footprintMasks,
+                    maskAngles,
+                    outlineCoords,
+                    obstacleValues,
+                    delta,
+                    epsilon,
+                    planningScale,
+                    allowDiagonal,
+                    threadLogStreams[i]);
+                // out[i].first = result.first;
+                // out[i].second.resize(py::array::ShapeContainer(result.second.shape(), result.second.shape() + result.second.ndim()));
+            } catch (const std::logic_error &e) {
+                threadErrorMessages[i].first = true;
+                threadErrorMessages[i].second = e.what();
+            }
+        }
+
+        for (auto &threadErrorMessage: threadErrorMessages) {
+            if (threadErrorMessage.first) { throw std::logic_error(threadErrorMessage.second); }
+        }
+
+        for (auto &threadLogStream: threadLogStreams) { std::cout << threadLogStream.str(); }
+
+        return out;
+    }
+}  // namespace exploration

@@ -6,7 +6,7 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 from matplotlib import pyplot as plt
 
-from bc_exploration.sensors.sensor_util import bresenham2d_with_intensities
+from bc_exploration.sensors.sensor_util import bresenham2d_within_image
 from bc_exploration.utilities.util import xy_to_rc, which_coords_in_bounds, wrap_angles, scan_to_points
 
 
@@ -65,7 +65,7 @@ class LogOddsMapper:
 
         new_angles = wrap_angles(angles.copy() + state[2])
         state_px = xy_to_rc(state, self._map)
-        position_px = state_px[:2].astype(np.int)
+        position_px = state_px[:2].astype(int)
 
         with np.errstate(invalid='ignore'):
             free_inds = np.logical_or(np.isnan(ranges), ranges >= self.sensor_range)
@@ -75,10 +75,10 @@ class LogOddsMapper:
         ranges[free_inds] = self.sensor_range
 
         occupied_coords = scan_to_points(new_angles[occ_inds], ranges[occ_inds]) + state[:2]
-        occupied_coords = xy_to_rc(occupied_coords, self._map).astype(np.int)
+        occupied_coords = xy_to_rc(occupied_coords, self._map).astype(int)
 
         free_endcoords = scan_to_points(new_angles[free_inds], ranges[free_inds]) + state[:2]
-        free_endcoords = xy_to_rc(free_endcoords, self._map).astype(np.int)
+        free_endcoords = xy_to_rc(free_endcoords, self._map).astype(int)
 
         if debug:
             occupied_coords_vis = occupied_coords[which_coords_in_bounds(occupied_coords, self._map.get_shape())]
@@ -89,19 +89,25 @@ class LogOddsMapper:
             plt.imshow(map_vis)
             plt.show()
 
-        free_coords = np.array([position_px])
+        # free_coords = np.array([position_px])
+        free_coords = [position_px.astype(int)]
         for i in range(occupied_coords.shape[0]):
-            bresenham_line = bresenham2d_with_intensities(position_px, occupied_coords[i, :], self._map.data.T)[:-1]
-            free_coords = np.vstack((free_coords, bresenham_line[:, :2]))
+            bresenham_line = bresenham2d_within_image(position_px, occupied_coords[i, :], *self._map.data.T.shape)[:-1]
+            free_coords.append(bresenham_line[:, :2].astype(int))
+            # free_coords = np.vstack((free_coords, bresenham_line[:, :2]))
 
         for i in range(free_endcoords.shape[0]):
-            bresenham_line = bresenham2d_with_intensities(position_px, free_endcoords[i, :], self._map.data.T)
-            free_coords = np.vstack((free_coords, bresenham_line[:, :2]))
+            bresenham_line = bresenham2d_within_image(position_px, free_endcoords[i, :], *self._map.data.T.shape)
+            free_coords.append(bresenham_line[:, :2].astype(int))
+            # free_coords = np.vstack((free_coords, bresenham_line[:, :2]))
 
-        free_coords = free_coords.astype(np.int)
+        free_coords = np.vstack(free_coords)
+        # free_coords = free_coords.astype(int)
 
-        occupied_coords = occupied_coords[which_coords_in_bounds(occupied_coords, self._map.get_shape())]
-        free_coords = free_coords[which_coords_in_bounds(free_coords, self._map.get_shape())]
+        if occupied_coords.shape[0] != 0:
+            occupied_coords = occupied_coords[which_coords_in_bounds(occupied_coords, self._map.get_shape())]
+        if free_coords.shape[0] != 0:
+            free_coords = free_coords[which_coords_in_bounds(free_coords, self._map.get_shape())]
 
         if debug:
             map_vis = np.repeat([self._map.copy()], repeats=3, axis=0).transpose((1, 2, 0))
@@ -113,7 +119,7 @@ class LogOddsMapper:
             plt.imshow(map_vis, interpolation='nearest')
             plt.show()
 
-        return occupied_coords.astype(np.int), free_coords.astype(np.int)
+        return occupied_coords.astype(int), free_coords
 
     def update(self, state, scan_angles, scan_ranges):
         """
@@ -134,25 +140,26 @@ class LogOddsMapper:
             # update the log odds for the coordinates measured
             if measured_occupied.shape[0]:
                 self._log_odds_map[measured_occupied[:, 0], measured_occupied[:, 1]] += np.log(g_occupied)
-                over_inds = np.argwhere(self._log_odds_map > self.max_log_odd)
-                self._log_odds_map[over_inds[:, 0], over_inds[:, 1]] = self.max_log_odd
+                # over_inds = np.argwhere(self._log_odds_map > self.max_log_odd)
+                # self._log_odds_map[over_inds[:, 0], over_inds[:, 1]] = self.max_log_odd
 
             if measured_free.shape[0]:
                 self._log_odds_map[measured_free[:, 0], measured_free[:, 1]] += np.log(g_free)
-                under_inds = np.argwhere(self._log_odds_map < self.min_log_odd)
-                self._log_odds_map[under_inds[:, 0], under_inds[:, 1]] = self.min_log_odd
+                # under_inds = np.argwhere(self._log_odds_map < self.min_log_odd)
+                # self._log_odds_map[under_inds[:, 0], under_inds[:, 1]] = self.min_log_odd
+            self._log_odds_map[...] = np.clip(self._log_odds_map, self.min_log_odd, self.max_log_odd)
 
             # compute the probability map from the log odds map
             self._probability_map = 1 - (1 / (1 + np.exp(self._log_odds_map)))
 
             # threshold the map to get the occupancy grid
-            occupied_coords = np.argwhere(self._probability_map > self.threshold_filled).astype(np.int)
-            free_coords = np.argwhere(self._probability_map < self.threshold_empty).astype(np.int)
+            # occupied_coords = np.argwhere(self._probability_map > self.threshold_filled).astype(int)
+            # free_coords = np.argwhere(self._probability_map < self.threshold_empty).astype(int)
+            # self._map.data[occupied_coords[:, 0], occupied_coords[:, 1]] = 0
+            # self._map.data[free_coords[:, 0], free_coords[:, 1]] = 255
 
-            self._map.data[occupied_coords[:, 0], occupied_coords[:, 1]] = np.zeros((occupied_coords.shape[0],),
-                                                                                    dtype=np.uint8)
-            self._map.data[free_coords[:, 0], free_coords[:, 1]] = 255 * np.ones((free_coords.shape[0],),
-                                                                                 dtype=np.uint8)
+            self._map.data[self._probability_map > self.threshold_filled] = 0
+            self._map.data[self._probability_map < self.threshold_empty] = 255
 
             return self._map
 

@@ -72,9 +72,9 @@ def extract_frontiers(occupancy_map, approx=True, approx_iters=2,
         # frontiers = [frontiers[rank] for i, rank in enumerate(frontier_ranks)
         #              if i < self.num_frontiers_considered]
         for frontier in frontiers:
-            # if frontier.astype(np.int).tolist() in self.frontier_blacklist:
+            # if frontier.astype(int).tolist() in self.frontier_blacklist:
             #     continue
-            frontier_px = xy_to_rc(frontier, occupancy_map).astype(np.int)
+            frontier_px = xy_to_rc(frontier, occupancy_map).astype(int)
             frontier_px = frontier_px[which_coords_in_bounds(frontier_px, occupancy_map.get_shape())]
             frontier_map[frontier_px[:, 0], frontier_px[:, 1]] = [255, 0, 0]
 
@@ -239,7 +239,7 @@ class FrontierAgent(Agent):
         frontier_sizes = np.array([frontier.shape[0] if len(frontier.shape) > 1 else 1 for frontier in frontiers])
         valid_frontier_inds = np.argwhere(frontier_sizes >= self._min_frontier_size)
         return [frontier for i, frontier in enumerate(frontiers)
-                if i in valid_frontier_inds and xy_to_rc(frontier, occupancy_map).astype(np.int).tolist()
+                if i in valid_frontier_inds and xy_to_rc(frontier, occupancy_map).astype(int).tolist()
                 not in self._frontier_blacklist]
 
     def _compute_frontier_ranks(self, state, frontiers):
@@ -354,7 +354,7 @@ class FrontierAgent(Agent):
             if best_frontier.shape[0] == 0:
                 continue
 
-            best_frontier_rc_list = xy_to_rc(best_frontier, exploration_map).astype(np.int).tolist()
+            best_frontier_rc_list = xy_to_rc(best_frontier, exploration_map).astype(int).tolist()
             if best_frontier_rc_list in self._frontier_blacklist:
                 frontier_ranks = np.delete(frontier_ranks, frontier_idx)
                 continue
@@ -392,7 +392,7 @@ class FrontierAgent(Agent):
             if debug:
                 frontier_map = np.repeat([exploration_map.data], repeats=3, axis=0).transpose((1, 2, 0)).copy()
                 best_frontier = frontiers[frontier_ranks[frontier_idx]]
-                best_frontier_vis = xy_to_rc(best_frontier, exploration_map).astype(np.int)
+                best_frontier_vis = xy_to_rc(best_frontier, exploration_map).astype(int)
                 best_frontier_vis = best_frontier_vis[
                     which_coords_in_bounds(best_frontier_vis, exploration_map.get_shape())]
                 frontier_map[best_frontier_vis[:, 0], best_frontier_vis[:, 1]] = [255, 0, 0]
@@ -425,9 +425,9 @@ class FrontierAgent(Agent):
                 plan_successful, path = oriented_astar_partial(goal=goal, delta=planning_delta)
 
                 path_map = np.array(exploration_map.data)
-                path_vis = xy_to_rc(path, exploration_map)[:, :2].astype(np.int)
+                path_vis = xy_to_rc(path, exploration_map)[:, :2].astype(int)
                 best_frontier = frontiers[frontier_ranks[frontier_idx]]
-                best_frontier_vis = xy_to_rc(best_frontier, exploration_map).astype(np.int)
+                best_frontier_vis = xy_to_rc(best_frontier, exploration_map).astype(int)
                 best_frontier_vis = best_frontier_vis[
                     which_coords_in_bounds(best_frontier_vis, exploration_map.get_shape())]
                 path_map[best_frontier_vis[:, 0], best_frontier_vis[:, 1]] = 75

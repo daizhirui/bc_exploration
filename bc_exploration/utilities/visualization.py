@@ -23,7 +23,7 @@ def draw_footprint_path(footprint, path, visualization_map, footprint_color=None
     """
     path_px = xy_to_rc(path, visualization_map)
     if path_color is not None:
-        visualization_map.data[path_px[:, 0].astype(np.int), path_px[:, 1].astype(np.int)] = path_color
+        visualization_map.data[path_px[:, 0].astype(int), path_px[:, 1].astype(int)] = path_color
 
     if footprint_color is not None:
         actual_footprint = footprint.no_inflation()
@@ -33,7 +33,7 @@ def draw_footprint_path(footprint, path, visualization_map, footprint_color=None
         footprints_coords = outline_coords[angle_inds] + np.expand_dims(path_px[:, :2], axis=1)
 
         for footprint_coords in footprints_coords:
-            cv2.drawContours(visualization_map.data, [footprint_coords[:, ::-1].astype(np.int)], 0, footprint_color, footprint_thickness)
+            cv2.drawContours(visualization_map.data, [footprint_coords[:, ::-1].astype(int)], 0, footprint_color, footprint_thickness)
 
 
 def draw_frontiers(visualization_map, frontiers, color):
@@ -45,7 +45,7 @@ def draw_frontiers(visualization_map, frontiers, color):
                   a valid value for the color to draw the path
     """
     for frontier in frontiers:
-        frontier_px = xy_to_rc(frontier, visualization_map).astype(np.int)
+        frontier_px = xy_to_rc(frontier, visualization_map).astype(int)
         frontier_px = frontier_px[which_coords_in_bounds(frontier_px, visualization_map.get_shape())]
         cv2.drawContours(visualization_map.data, [frontier_px[:, ::-1]], 0, color, 2)
 
@@ -61,7 +61,7 @@ def draw_scan_ranges(visualization_map, state, scan_angles, scan_ranges, color):
               a valid value for the color to draw the path
     """
     occupied_coords = scan_to_points(scan_angles + state[2], scan_ranges) + state[:2]
-    occupied_coords = xy_to_rc(occupied_coords, visualization_map).astype(np.int)
+    occupied_coords = xy_to_rc(occupied_coords, visualization_map).astype(int)
     occupied_coords = occupied_coords[which_coords_in_bounds(occupied_coords, visualization_map.get_shape())]
     visualization_map.data[occupied_coords[:, 0], occupied_coords[:, 1]] = color
 

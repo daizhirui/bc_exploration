@@ -26,7 +26,7 @@ def test_extract_frontiers(debug=False):
     if debug:
         frontier_map = np.repeat([occupancy_map.data], repeats=3, axis=0).transpose((1, 2, 0))
         for frontier in significant_frontiers:
-            frontier_px = xy_to_rc(frontier, occupancy_map).astype(np.int)
+            frontier_px = xy_to_rc(frontier, occupancy_map).astype(int)
             frontier_px = frontier_px[which_coords_in_bounds(frontier_px, occupancy_map.get_shape())]
             frontier_map[frontier_px[:, 0], frontier_px[:, 1]] = [255, 0, 0]
 

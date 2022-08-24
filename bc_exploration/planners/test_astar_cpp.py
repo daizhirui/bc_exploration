@@ -36,7 +36,7 @@ def test_one_astar(debug=False):
 
     if debug:
         map_solution = np.dstack((occupancy_map.data, occupancy_map.data, occupancy_map.data))
-        path_px = xy_to_rc(path, occupancy_map).astype(np.int)
+        path_px = xy_to_rc(path, occupancy_map).astype(int)
         map_solution[path_px[:, 0], path_px[:, 1]] = [0, 0, 255]
 
         if success:
@@ -191,14 +191,14 @@ def debug_real_case():
         print("failed to find solution")
 
     map_solution = np.dstack((occupancy_map.data, occupancy_map.data, occupancy_map.data))
-    map_solution[path[:, 0].astype(np.int), path[:, 1].astype(np.int)] = [0, 0, 255]
+    map_solution[path[:, 0].astype(int), path[:, 1].astype(int)] = [0, 0, 255]
 
     footprint = CustomFootprint(footprint_points, np.pi / 4., inflation_scale=1.0)
     outline_coords = np.array(footprint.get_outline_coords(occupancy_map.resolution))
     angle_inds = np.argmin(np.abs(path[:, 2:] - np.expand_dims(c_angles, axis=0)), axis=1)
     draw_footprints = outline_coords[angle_inds] + np.expand_dims(path[:, :2], axis=1)
     draw_footprints = draw_footprints.reshape(draw_footprints.shape[0] * draw_footprints.shape[1],
-                                              draw_footprints.shape[2]).astype(np.int)
+                                              draw_footprints.shape[2]).astype(int)
     map_solution[draw_footprints[:, 0], draw_footprints[:, 1]] = [255, 0, 0]
 
     plt.imshow(map_solution.data, interpolation='nearest')
