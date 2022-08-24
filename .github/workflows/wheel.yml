@@ -22,11 +22,11 @@ jobs:
                 run: git config --global --add safe.directory '*'
             -   name: Checkout submodules
                 run: git submodule update --init --recursive
-            -   name: Setup Python
-                uses: actions/setup-python@v4
-                with:
-                    python-version: '3.8'
-                    architecture: x64
+            # -   name: Setup Python
+            #     uses: actions/setup-python@v4
+            #     with:
+            #         python-version: '3.8'
+            #         architecture: x64
             -   name: Install Python Packages
                 run: pip3 install -r requirements.txt --user
             -   name: Build Wheel
