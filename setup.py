@@ -48,7 +48,6 @@ class CMakeBuild(build_ext):
         ext_dir = os.path.abspath(os.path.dirname(original_full_path))
         ext_dir = os.path.join(ext_dir, self.distribution.get_name())
         cmake_args = [
-            f'-G', 'Ninja',
             f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={ext_dir}',
             f'-DPython3_ROOT_DIR={os.path.dirname(sys.executable)}',
             f'-DCMAKE_BUILD_TYPE={ext.build_type}'

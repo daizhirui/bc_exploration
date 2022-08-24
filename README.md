@@ -14,3 +14,15 @@ Includes integration with online mapping.
 Includes benchmarking framework / benchmarks
 
 # Install
+
+## Option 1.
+```shell
+pip3 install numpy==1.22.3
+python3 setup.py bdist
+pip3 install dist/diff_info_gathering-0.1.0-py3-none-any.whl --force-reinstall
+```
+
+## Option 2.
+```shell
+pip3 install . --force-reinstall
+```
