@@ -46,4 +46,4 @@ jobs:
                     name: wheel_file
                     path: dist/bc_exploration-0.0.1-cp38-cp38-linux_x86_64.whl
             -   name: Install Wheel
-                run: pip3 install dist/bc_exploration-0.0.1-cp38-cp38-linux_x86_64.whl
+                run: pip3 install dist/bc_exploration-0.0.1-cp38-cp38-linux_x86_64.whl --user
