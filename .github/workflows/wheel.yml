@@ -23,8 +23,8 @@ jobs:
                     submodules: recursive
             -   name: git safe.directory
                 run: git config --global --add safe.directory '*'
-            # -   name: Install Python Packages
-                # run: pip3 install -r requirements.txt --user
+            -   name: Install Python Packages
+                run: pip3 install -r requirements.txt --user
             -   name: Build Wheel
                 run: python3 setup.py bdist_wheel
             -   uses: actions/upload-artifact@v2
