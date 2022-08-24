@@ -35,18 +35,18 @@ jobs:
                 with:
                     name: wheel_file
                     path: dist/bc_exploration-0.0.1-cp38-cp38-linux_x86_64.whl
-    install_wheel:
-        runs-on: ubuntu-20.04
-        container:
-            image: ghcr.io/daizhirui/gp-sddf-ubuntu20.04:latest
-            credentials:
-                username: ${{ secrets.DOCKER_USERNAME }}
-                password: ${{ secrets.DOCKER_TOKEN }}
-        steps:
-            -   uses:
-                    actions/download-artifact@v2
-                with:
-                    name: wheel_file
-                    path: dist/bc_exploration-0.0.1-cp38-cp38-linux_x86_64.whl
-            -   name: Install Wheel
-                run: pip3 install dist/bc_exploration-0.0.1-cp38-cp38-linux_x86_64.whl
+    # install_wheel:
+    #     runs-on: ubuntu-20.04
+    #     container:
+    #         image: ghcr.io/daizhirui/gp-sddf-ubuntu20.04:latest
+    #         credentials:
+    #             username: ${{ secrets.DOCKER_USERNAME }}
+    #             password: ${{ secrets.DOCKER_TOKEN }}
+    #     steps:
+    #         -   uses:
+    #                 actions/download-artifact@v2
+    #             with:
+    #                 name: wheel_file
+    #                 path: dist/bc_exploration-0.0.1-cp38-cp38-linux_x86_64.whl
+    #         -   name: Install Wheel
+    #             run: pip3 install dist/bc_exploration-0.0.1-cp38-cp38-linux_x86_64.whl
