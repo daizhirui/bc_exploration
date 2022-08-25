@@ -72,7 +72,7 @@ with open('requirements.txt', 'r') as f:
 dependency_links = []
 for i in range(len(requires)):
     require = requires[i]
-    if require.startswith('git'):
+    if require.strip().startswith('git'):
         # dependency_links.append(require)
         name = require.split('=')[-1].strip()
         version = require.split('#egg')[0].split('@')[1]

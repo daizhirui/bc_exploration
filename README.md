@@ -15,14 +15,7 @@ Includes benchmarking framework / benchmarks
 
 # Install
 
-## Option 1.
 ```shell
-pip3 install numpy==1.22.3
-python3 setup.py bdist
-pip3 install dist/diff_info_gathering-0.1.0-py3-none-any.whl --force-reinstall
-```
-
-## Option 2.
-```shell
-pip3 install . --force-reinstall
+pip install .  # pip>=22.1
+pip install . --use-feature=in-tree-build  # older pip
 ```
