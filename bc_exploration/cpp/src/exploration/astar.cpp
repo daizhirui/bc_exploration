@@ -189,17 +189,10 @@ namespace exploration {
         openSet.push(startNode);
 
         std::vector<float> costs(occupancyMap.size(), inf);
-        // std::vector<float> costs((ulong) mapShape[0] * mapShape[1]);
-        // for (int i = 0; i < mapShape[0] * mapShape[1]; i++) { costs[i] = inf; }
         costs[startIdx] = 0.0;
 
         std::vector<int> paths(occupancyMap.size(), -1);
-        // std::vector<int> paths((ulong) mapShape[0] * mapShape[1]);
-        // for (int i = 0; i < mapShape[0] * mapShape[1]; i++) { paths[i] = -1; }
-
         std::vector<int> pathsAngleInds(occupancyMap.size(), -1);
-        // std::vector<int> paths_angle_inds((ulong) mapShape[0] * mapShape[1]);
-        // for (int i = 0; i < mapShape[0] * mapShape[1]; i++) { paths_angle_inds[i] = -1; }
 
         int children[8][2];
         int parentCoord[2];
@@ -256,10 +249,7 @@ namespace exploration {
                 // skip child if out of bounds
                 if (children[c][0] < 0 || children[c][0] >= mapShape[0] || children[c][1] < 0 || children[c][1] >= mapShape[1]) { continue; }
 
-                // auto child = py::ndarray<int>(py::array::ShapeContainer{2});
                 Eigen::Map<Eigen::Vector2i> child = Eigen::Map<Eigen::Vector2i>(children[c]);
-                // child.mutable_at(0) = children[c][0];
-                // child.mutable_at(1) = children[c][1];
 
                 if (checkForCollision(child, occupancyMap, footprintMasks[c], outlineCoords[c], obstacleValues)) { continue; }
 
@@ -287,8 +277,7 @@ namespace exploration {
             currentAngle = maskAngles.coeffRef(pathsAngleInds[currentIdx]);
         }
 
-        // auto path_px = py::ndarray<float>(py::array::ShapeContainer{(ssize_t) pathStack.size(), (ssize_t) 3});
-        auto pathPX = Eigen::MatrixX3f(pathStack.size(), 3);
+        auto pathPX = Eigen::MatrixX3f(pathStack.size(), 3);  // FIXME: may be ZERO!!!
         int i = 0;
         int coord[2];
         while (!pathStack.empty()) {
@@ -300,8 +289,12 @@ namespace exploration {
         }
 
         auto n = pathPX.rows();
-        ostream << "expanded " << numNodesExpanded << " nodes, path (" << pathPX.coeffRef(0, 0) << ", " << pathPX.coeffRef(0, 1) << ") -> ("
-                << pathPX.coeffRef(n - 1, 0) << ", " << pathPX.coeffRef(n - 1, 1) << "), length: " << n << ", successful: " << isSuccessful << std::endl;
+        ostream << "expanded " << numNodesExpanded << " nodes";
+        if (n > 0) {
+            ostream << ", path (" << pathPX.coeffRef(0, 0) << ", " << pathPX.coeffRef(0, 1) << ") -> (" << pathPX.coeffRef(n - 1, 0) << ", "
+                    << pathPX.coeffRef(n - 1, 1) << "), length: " << n;
+        }
+        ostream << ", successful: " << isSuccessful << std::endl;
         return std::make_pair(isSuccessful, pathPX);
     }
 
@@ -319,15 +312,6 @@ namespace exploration {
         int planningScale,
         bool allowDiagonal,
         bool parallel) {
-
-        // int cnt = 0;
-        // py::assert_ndarray_dims<1>(start);
-        // py::assert_ndarray_dims<2>(goals);
-        // py::assert_ndarray_dims<2>(occupancy_map);
-        // for (auto &footprint_mask: footprint_masks) { py::assert_ndarray_dims<2>(footprint_mask); }
-        // py::assert_ndarray_dims<1>(mask_angles);
-        // for (auto &outline_coord: outline_coords) { py::assert_ndarray_dims<2>(outline_coord); }
-        // py::assert_ndarray_dims<1>(obstacle_values);
 
         std::vector<std::pair<bool, Eigen::MatrixX3f>> out(goals.rows());
         std::vector<std::pair<bool, std::string>> threadErrorMessages(goals.rows());
@@ -353,9 +337,7 @@ namespace exploration {
         for (int i = 0; i < goals.rows(); ++i) {
             auto &goal = goals.row(i).transpose();
             threadErrorMessages[i].first = false;
-            // auto goal = py::ndarray<int>(py::array::ShapeContainer{2});
-            // goal.mutable_at(0) = goals.at(i, 0);
-            // goal.mutable_at(1) = goals.at(i, 1);
+
             try {
                 out[i] = orientedAstar(
                     start,
@@ -370,8 +352,6 @@ namespace exploration {
                     planningScale,
                     allowDiagonal,
                     threadLogStreams[i]);
-                // out[i].first = result.first;
-                // out[i].second.resize(py::array::ShapeContainer(result.second.shape(), result.second.shape() + result.second.ndim()));
             } catch (const std::logic_error &e) {
                 threadErrorMessages[i].first = true;
                 threadErrorMessages[i].second = e.what();
