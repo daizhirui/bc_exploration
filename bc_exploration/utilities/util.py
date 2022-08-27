@@ -138,7 +138,8 @@ def scan_to_points(angles, ranges):
     :param ranges array(N)[float]: ranges corresponding to the angles
     :return array(N,2)[float]: ndarray, points
     """
-    points = np.nan * np.ones((angles.shape[0], 2))
+    # points = np.nan * np.ones((angles.shape[0], 2))
+    points = np.full((angles.shape[0], 2), np.nan)
     good_inds = np.logical_not(np.logical_or(np.isinf(ranges), np.isnan(ranges)))
     points[good_inds, :] = np.expand_dims(ranges[good_inds], axis=1) * \
         np.array([np.cos(angles[good_inds]), np.sin(angles[good_inds])]).T

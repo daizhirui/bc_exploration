@@ -91,9 +91,6 @@ def visualize(occupancy_map, state, scan_angles, scan_ranges, footprint, path, r
                             visualization_map=map_vis, footprint_color=[200, 255, 200], path_color=None,
                             footprint_thickness=-1)
 
-    if len(frontiers):
-        draw_frontiers(visualization_map=map_vis, frontiers=frontiers, color=[255, 150, 80])
-
     if start_state is not None:
         footprint.no_inflation().draw([0, 0, start_state[2]], map_vis, [10, 122, 127])
     footprint.no_inflation().draw(state, map_vis, [127, 122, 10])
@@ -101,6 +98,14 @@ def visualize(occupancy_map, state, scan_angles, scan_ranges, footprint, path, r
     if scan_ranges.shape[0]:
         draw_scan_ranges(visualization_map=map_vis, state=state,
                          scan_angles=scan_angles, scan_ranges=scan_ranges, color=[0, 255, 0])
+
+    if len(frontiers):
+        successful_frontiers = [frontier for frontier, flag in frontiers if flag]
+        failed_frontiers = [frontier for frontier, flag in frontiers if not flag]
+        if len(successful_frontiers):
+            draw_frontiers(visualization_map=map_vis, frontiers=successful_frontiers, color=[255, 150, 80])
+        if len(failed_frontiers):
+            draw_frontiers(visualization_map=map_vis, frontiers=failed_frontiers, color=[0, 0, 255])
 
     # visualize map
     cv2.namedWindow('map', cv2.WINDOW_GUI_NORMAL)

@@ -160,9 +160,9 @@ namespace exploration {
         const float inf = std::numeric_limits<float>::infinity();
 
         // verify angles are correct (i.e human knows what he is doing when he calls this function)
-        std::vector<float> correct_angles = getAstarAngles();
+        std::vector<float> correctAngles = getAstarAngles();
         for (int i = 0; i < 8; i++) {
-            if (correct_angles[i] != maskAngles.coeffRef(i)) {
+            if (correctAngles[i] != maskAngles.coeffRef(i)) {
                 throw std::logic_error("ERROR: parameter maskAngles of c++ function oriented_astar() does not match required angles. "
                                        "See get_astar_angles() for the correct angles/order. "
                                        "Note, the footprint masks must match these angles, or you will get undesired behavior!");

@@ -166,4 +166,3 @@ def bresenham2d(p0, p1):
         else:
             y = y0 - np.cumsum(q)
     return np.vstack((x, y)).T
-

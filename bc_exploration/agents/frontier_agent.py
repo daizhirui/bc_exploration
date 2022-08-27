@@ -4,7 +4,6 @@ return a path to the "best" frontier.
 """
 from __future__ import print_function, absolute_import, division
 
-
 import cv2
 import numpy as np
 
@@ -17,9 +16,9 @@ from bc_exploration.planners.astar_cpp import oriented_astar, get_astar_angles
 from bc_exploration.utilities.util import wrap_angles, which_coords_in_bounds, xy_to_rc, rc_to_xy
 
 
-def extract_frontiers(occupancy_map, approx=True, approx_iters=2,
+def extract_frontiers(occupancy_map, approx=True, approx_iters=4,
                       kernel=cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)),
-                      debug=False):
+                      debug=False, debug_min_frontier_size=None):
     """
     Given a map of free/occupied/unexplored pixels, identify the frontiers.
     This method is a quicker method than the brute force approach,
@@ -28,7 +27,7 @@ def extract_frontiers(occupancy_map, approx=True, approx_iters=2,
 
     :param occupancy_map Costmap: object corresponding to the map to extract frontiers from
     :param approx bool: does an approximation of the map before extracting frontiers. (dilate erode, get rid of single
-                   pixel unexplored areas creating a large number fo frontiers)
+                   pixel unexplored areas creating a large number of frontiers)
     :param approx_iters int: number of iterations for the dilate erode
     :param kernel array(N, N)[float]: the kernel of which to use to extract frontiers / approx map
     :param debug bool: show debug windows?
@@ -71,14 +70,20 @@ def extract_frontiers(occupancy_map, approx=True, approx_iters=2,
         frontier_map = np.repeat([occupancy_map.data], repeats=3, axis=0).transpose((1, 2, 0))
         # frontiers = [frontiers[rank] for i, rank in enumerate(frontier_ranks)
         #              if i < self.num_frontiers_considered]
+
+        cnt = 0
         for frontier in frontiers:
+            if debug_min_frontier_size and max([len(frontier), 1]) < debug_min_frontier_size:
+                continue
+            cnt += 1
             # if frontier.astype(int).tolist() in self.frontier_blacklist:
             #     continue
             frontier_px = xy_to_rc(frontier, occupancy_map).astype(int)
             frontier_px = frontier_px[which_coords_in_bounds(frontier_px, occupancy_map.get_shape())]
             frontier_map[frontier_px[:, 0], frontier_px[:, 1]] = [255, 0, 0]
 
-        plt.imshow(frontier_map, cmap='gray', interpolation='nearest')
+        plt.imshow(frontier_map, cmap='gray')
+        plt.title(f'{cnt} frontiers')
         plt.show()
 
     return frontiers

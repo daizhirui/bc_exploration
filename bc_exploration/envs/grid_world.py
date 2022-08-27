@@ -50,7 +50,9 @@ class GridWorld:
 
         self._state = None
         self._map = None
-        self._truth_free_coords = None
+        # self._truth_free_coords = None
+        self._truth_free_mask = None
+        self._truth_free_area = None
 
         self._load_map(map_filename, map_resolution, map_padding)
 
@@ -119,12 +121,20 @@ class GridWorld:
         :param occupancy_map Costmap: input map to be compared with ground truth
         :return float: percentage covered of the input map to the ground truth map
         """
-        if self._truth_free_coords is None:
-            start_state_px = xy_to_rc(self._start_state, self._map)
-            self._truth_free_coords = compute_connected_pixels(start_state_px, self._map.data)
+        if self._truth_free_mask is None:
+            self._truth_free_mask = self._map.data == Costmap.FREE
+            self._truth_free_area = np.sum(self._truth_free_mask)
+        mask1 = occupancy_map.data == Costmap.FREE
+        # mask2 = self._map.data == Costmap.FREE
+        # mask2 = self._truth_free_mask
+        intersect = mask1 & self._truth_free_mask
+        return np.sum(intersect) / self._truth_free_area
 
-        # free_coords = np.argwhere(occupancy_map.data == Costmap.FREE)
-        return np.sum(occupancy_map.data == Costmap.FREE) / float(self._truth_free_coords.shape[0])
+        # if self._truth_free_mask is None:
+        #     start_state_px = xy_to_rc(self._start_state, self._map)
+        #     self._truth_free_mask = compute_connected_pixels(start_state_px, self._map.data)
+
+        # return np.sum(occupancy_map.data == Costmap.FREE) / float(self._truth_free_mask.shape[0])
 
     def step(self, desired_state):
         """
