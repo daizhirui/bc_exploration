@@ -7,7 +7,12 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from bc_exploration.sensors.sensor_util import bresenham2d_within_image
-from bc_exploration.utilities.util import xy_to_rc, which_coords_in_bounds, wrap_angles, scan_to_points
+from bc_exploration.utilities.util import (
+    xy_to_rc,
+    which_coords_in_bounds,
+    wrap_angles,
+    scan_to_points,
+)
 
 
 class LogOddsMapper:
@@ -15,14 +20,17 @@ class LogOddsMapper:
     Traditional log-odds based occupancy mapper.
     Call the update function with your occupied and free coords to start mapping!
     """
-    def __init__(self,
-                 initial_map,
-                 sensor_range,
-                 measurement_certainty=.8,
-                 max_log_odd=50,
-                 min_log_odd=-8,
-                 threshold_occupied=.7,
-                 threshold_free=.3):
+
+    def __init__(
+        self,
+        initial_map,
+        sensor_range,
+        measurement_certainty=0.9,
+        max_log_odd=50,
+        min_log_odd=-8,
+        threshold_occupied=0.7,
+        threshold_free=0.3,
+    ):
         """
         Traditional log-odds based occupancy mapper. Call the update function with your occupied and free coords
         to start mapping!
@@ -67,23 +75,35 @@ class LogOddsMapper:
         state_px = xy_to_rc(state, self._map)
         position_px = state_px[:2].astype(int)
 
-        with np.errstate(invalid='ignore'):
+        with np.errstate(invalid="ignore"):
             free_inds = np.logical_or(np.isnan(ranges), ranges >= self.sensor_range)
             occ_inds = np.logical_not(free_inds)
 
         ranges = ranges.copy()
         ranges[free_inds] = self.sensor_range
 
-        occupied_coords = scan_to_points(new_angles[occ_inds], ranges[occ_inds]) + state[:2]
+        occupied_coords = (
+            scan_to_points(new_angles[occ_inds], ranges[occ_inds]) + state[:2]
+        )
         occupied_coords = xy_to_rc(occupied_coords, self._map).astype(int)
 
-        free_endcoords = scan_to_points(new_angles[free_inds], ranges[free_inds]) + state[:2]
+        free_endcoords = (
+            scan_to_points(new_angles[free_inds], ranges[free_inds]) + state[:2]
+        )
         free_endcoords = xy_to_rc(free_endcoords, self._map).astype(int)
 
         if debug:
-            occupied_coords_vis = occupied_coords[which_coords_in_bounds(occupied_coords, self._map.get_shape())]
-            free_coords_vis = free_endcoords[which_coords_in_bounds(free_endcoords, self._map.get_shape())]
-            map_vis = np.repeat([self._map.data], repeats=3, axis=0).transpose((1, 2, 0)).copy()
+            occupied_coords_vis = occupied_coords[
+                which_coords_in_bounds(occupied_coords, self._map.get_shape())
+            ]
+            free_coords_vis = free_endcoords[
+                which_coords_in_bounds(free_endcoords, self._map.get_shape())
+            ]
+            map_vis = (
+                np.repeat([self._map.data], repeats=3, axis=0)
+                .transpose((1, 2, 0))
+                .copy()
+            )
             map_vis[occupied_coords_vis[:, 0], occupied_coords_vis[:, 1]] = [255, 0, 0]
             map_vis[free_coords_vis[:, 0], free_coords_vis[:, 1]] = [0, 255, 0]
             plt.imshow(map_vis)
@@ -92,12 +112,16 @@ class LogOddsMapper:
         # free_coords = np.array([position_px])
         free_coords = [position_px.astype(int)]
         for i in range(occupied_coords.shape[0]):
-            bresenham_line = bresenham2d_within_image(position_px, occupied_coords[i, :], *self._map.data.T.shape)[:-1]
+            bresenham_line = bresenham2d_within_image(
+                position_px, occupied_coords[i, :], *self._map.data.T.shape
+            )[:-1]
             free_coords.append(bresenham_line[:, :2].astype(int))
             # free_coords = np.vstack((free_coords, bresenham_line[:, :2]))
 
         for i in range(free_endcoords.shape[0]):
-            bresenham_line = bresenham2d_within_image(position_px, free_endcoords[i, :], *self._map.data.T.shape)
+            bresenham_line = bresenham2d_within_image(
+                position_px, free_endcoords[i, :], *self._map.data.T.shape
+            )
             free_coords.append(bresenham_line[:, :2].astype(int))
             # free_coords = np.vstack((free_coords, bresenham_line[:, :2]))
 
@@ -105,21 +129,27 @@ class LogOddsMapper:
         # free_coords = free_coords.astype(int)
 
         if occupied_coords.shape[0] != 0:
-            occupied_coords = occupied_coords[which_coords_in_bounds(occupied_coords, self._map.get_shape())]
+            occupied_coords = occupied_coords[
+                which_coords_in_bounds(occupied_coords, self._map.get_shape())
+            ]
         if free_coords.shape[0] != 0:
-            free_coords = free_coords[which_coords_in_bounds(free_coords, self._map.get_shape())]
+            free_coords = free_coords[
+                which_coords_in_bounds(free_coords, self._map.get_shape())
+            ]
 
         if debug:
-            map_vis = np.repeat([self._map.copy()], repeats=3, axis=0).transpose((1, 2, 0))
+            map_vis = np.repeat([self._map.copy()], repeats=3, axis=0).transpose(
+                (1, 2, 0)
+            )
 
             map_vis[occupied_coords[:, 0], occupied_coords[:, 1]] = [10, 10, 127]
             map_vis[free_coords[:, 0], free_coords[:, 1]] = [127, 10, 127]
             map_vis[int(state[0]), int(state[1])] = [127, 122, 10]
 
-            plt.imshow(map_vis, interpolation='nearest')
+            plt.imshow(map_vis, interpolation="nearest")
             plt.show()
 
-        return occupied_coords.astype(int), free_coords
+        return np.round(occupied_coords).astype(int), free_coords
 
     def update(self, state, scan_angles, scan_ranges):
         """
@@ -130,24 +160,32 @@ class LogOddsMapper:
         :return Costmap: an occupancy map showing free, occupied and unexplored space
         """
         map_state = state.copy()
-        measured_occupied, measured_free = self._scan_to_occupied_free_coords(map_state, scan_angles, scan_ranges)
+        measured_occupied, measured_free = self._scan_to_occupied_free_coords(
+            map_state, scan_angles, scan_ranges
+        )
 
         # calculate log likelihood factors for adjusting the log odds
-        g_occupied = self.measurement_certainty / (1. - self.measurement_certainty)
-        g_free = 1. / g_occupied
+        g_occupied = self.measurement_certainty / (1.0 - self.measurement_certainty)
+        g_free = 1.0 / g_occupied
 
         try:
             # update the log odds for the coordinates measured
             if measured_occupied.shape[0]:
-                self._log_odds_map[measured_occupied[:, 0], measured_occupied[:, 1]] += np.log(g_occupied)
+                self._log_odds_map[
+                    measured_occupied[:, 0], measured_occupied[:, 1]
+                ] += np.log(g_occupied)
                 # over_inds = np.argwhere(self._log_odds_map > self.max_log_odd)
                 # self._log_odds_map[over_inds[:, 0], over_inds[:, 1]] = self.max_log_odd
 
             if measured_free.shape[0]:
-                self._log_odds_map[measured_free[:, 0], measured_free[:, 1]] += np.log(g_free)
+                self._log_odds_map[measured_free[:, 0], measured_free[:, 1]] += np.log(
+                    g_free
+                )
                 # under_inds = np.argwhere(self._log_odds_map < self.min_log_odd)
                 # self._log_odds_map[under_inds[:, 0], under_inds[:, 1]] = self.min_log_odd
-            self._log_odds_map[...] = np.clip(self._log_odds_map, self.min_log_odd, self.max_log_odd)
+            self._log_odds_map[...] = np.clip(
+                self._log_odds_map, self.min_log_odd, self.max_log_odd
+            )
 
             # compute the probability map from the log odds map
             self._probability_map = 1 - (1 / (1 + np.exp(self._log_odds_map)))
@@ -164,7 +202,9 @@ class LogOddsMapper:
             return self._map
 
         except IndexError:
-            raise IndexError("Map size is too small to fit your measurements! Increase allocated map size!!")
+            raise IndexError(
+                "Map size is too small to fit your measurements! Increase allocated map size!!"
+            )
 
     def get_log_odds_map(self):
         """

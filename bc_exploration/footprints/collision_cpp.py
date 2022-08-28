@@ -9,7 +9,9 @@ from bc_exploration.utilities.util import xy_to_rc
 from bc_exploration.cpp import c_check_for_collision
 
 
-def check_for_collision(state, occupancy_map, footprint_mask, outline_coords, obstacle_values):
+def check_for_collision(
+    state, occupancy_map, footprint_mask, outline_coords, obstacle_values
+):
     """
     Check if the current state with the given footprint is colliding or not.
     :param state array(3)[float]: pose of the robot
@@ -30,10 +32,8 @@ def check_for_collision(state, occupancy_map, footprint_mask, outline_coords, ob
     c_outline_coords = np.array(outline_coords, dtype=np.int32)
     c_obstacle_values = np.array(obstacle_values, dtype=np.uint8)
 
-    is_colliding = c_check_for_collision(c_state,
-                                         c_occupancy_map,
-                                         c_footprint_mask,
-                                         c_outline_coords,
-                                         c_obstacle_values)
+    is_colliding = c_check_for_collision(
+        c_state, c_occupancy_map, c_footprint_mask, c_outline_coords, c_obstacle_values
+    )
 
     return is_colliding

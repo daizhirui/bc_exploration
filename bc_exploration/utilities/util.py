@@ -17,7 +17,9 @@ def load_occupancy_map_data(group, filename):
     :param filename str: the image filename within the subfolder group.
     :return array(N,M)[uint8]: occupancy map data corresponded to the loaded image file
     """
-    return cv2.cvtColor(cv2.imread(os.path.join(get_maps_dir(), group, filename)), cv2.COLOR_BGR2GRAY).astype(np.uint8)
+    return cv2.cvtColor(
+        cv2.imread(os.path.join(get_maps_dir(), group, filename)), cv2.COLOR_BGR2GRAY
+    ).astype(np.uint8)
 
 
 def get_rotation_matrix_2d(angle):
@@ -45,12 +47,19 @@ def which_coords_in_bounds(coords, map_shape):
     assert np.array(map_shape).dtype == np.int
     assert coords.size > 0
     if len(coords.shape) == 1:
-        return (coords[0] >= 0) and (coords[0] < map_shape[0]) and (coords[1] >= 0) and (coords[1] < map_shape[1])
+        return (
+            (coords[0] >= 0)
+            and (coords[0] < map_shape[0])
+            and (coords[1] >= 0)
+            and (coords[1] < map_shape[1])
+        )
     else:
         x = coords[:, 0]
         y = coords[:, 1]
-        return np.logical_and(np.logical_and(x >= 0, x < map_shape[0]),
-                              np.logical_and(y >= 0, y < map_shape[1]))
+        return np.logical_and(
+            np.logical_and(x >= 0, x < map_shape[0]),
+            np.logical_and(y >= 0, y < map_shape[1]),
+        )
 
 
 def wrap_angles(angles, is_radians=True):
@@ -76,7 +85,10 @@ def clip_range(min_range, max_range, map_shape):
     :return Tuple[array(2), array(2)]: the min range and max range, clipped.
     """
     clipped_min_range = [max(min_range[0], 0), max(min_range[1], 0)]
-    clipped_max_range = [min(max_range[0], map_shape[0]), min(max_range[1], map_shape[1])]
+    clipped_max_range = [
+        min(max_range[0], map_shape[0]),
+        min(max_range[1], map_shape[1]),
+    ]
     return clipped_min_range, clipped_max_range
 
 
@@ -88,8 +100,10 @@ def numpy_diff2d(set1, set2):
     :return array(N, 2)[int]: coordinates that appear in both sets
     """
     set2 = set2.astype(set1.dtype)
-    dtype = {'names': ['f{}'.format(i) for i in range(set1.shape[1])],
-             'formats': set1.shape[1] * [set1.dtype]}
+    dtype = {
+        "names": ["f{}".format(i) for i in range(set1.shape[1])],
+        "formats": set1.shape[1] * [set1.dtype],
+    }
 
     common_coords = np.intersect1d(set1.view(dtype), set2.view(dtype))
     common_coords = common_coords.view(set1.dtype).reshape(-1, set1.shape[1])
@@ -120,7 +134,9 @@ def compute_connected_pixels(start_state, image, flood_value=77, debug=False):
     truth_floodfill = image.copy()
 
     assert flood_value not in np.unique(image).tolist()
-    cv2.floodFill(truth_floodfill, mask, tuple(start_state[:2][::-1].astype(int)), flood_value)
+    cv2.floodFill(
+        truth_floodfill, mask, tuple(start_state[:2][::-1].astype(int)), flood_value
+    )
 
     if debug:
         cv2.imshow("", truth_floodfill)
@@ -141,8 +157,10 @@ def scan_to_points(angles, ranges):
     # points = np.nan * np.ones((angles.shape[0], 2))
     points = np.full((angles.shape[0], 2), np.nan)
     good_inds = np.logical_not(np.logical_or(np.isinf(ranges), np.isnan(ranges)))
-    points[good_inds, :] = np.expand_dims(ranges[good_inds], axis=1) * \
-        np.array([np.cos(angles[good_inds]), np.sin(angles[good_inds])]).T
+    points[good_inds, :] = (
+        np.expand_dims(ranges[good_inds], axis=1)
+        * np.array([np.cos(angles[good_inds]), np.sin(angles[good_inds])]).T
+    )
     return points
 
 
@@ -156,12 +174,16 @@ def xy_to_rc(pose, occupancy_map):
     new_pose = np.array(pose, dtype=np.float)
     if len(new_pose.shape) == 1:
         new_pose[:2] -= occupancy_map.origin
-        new_pose[1] = (occupancy_map.get_size()[1] - occupancy_map.resolution) - new_pose[1]
+        new_pose[1] = (
+            occupancy_map.get_size()[1] - occupancy_map.resolution
+        ) - new_pose[1]
         new_pose[[0, 1]] = new_pose[[1, 0]]
         new_pose[:2] = np.rint(new_pose[:2] / occupancy_map.resolution)
     else:
         new_pose[:, :2] -= occupancy_map.origin
-        new_pose[:, 1] = (occupancy_map.get_size()[1] - occupancy_map.resolution) - new_pose[:, 1]
+        new_pose[:, 1] = (
+            occupancy_map.get_size()[1] - occupancy_map.resolution
+        ) - new_pose[:, 1]
         new_pose[:, [0, 1]] = new_pose[:, [1, 0]]
         new_pose[:, :2] = np.rint(new_pose[:, :2] / occupancy_map.resolution)
     return new_pose
@@ -196,7 +218,7 @@ def round_to_increment(x, increment):
     :param increment float: increment to round to
     :return float: rounded number
     """
-    precision = len(str(increment).split('.')[1]) if '.' in str(increment) else 0
+    precision = len(str(increment).split(".")[1]) if "." in str(increment) else 0
     answer = np.round(increment * np.round(float(x) / increment), precision)
     return answer
 

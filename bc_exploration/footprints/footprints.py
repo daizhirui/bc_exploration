@@ -9,8 +9,12 @@ import numpy as np
 from bc_exploration.footprints.collision_cpp import check_for_collision
 from bc_exploration.mapping.costmap import Costmap
 from bc_exploration.utilities.util import rc_to_xy, get_rotation_matrix_2d
-from bc_exploration.utilities.util import which_coords_in_bounds, compute_circumscribed_radius, \
-    clip_range, xy_to_rc
+from bc_exploration.utilities.util import (
+    which_coords_in_bounds,
+    compute_circumscribed_radius,
+    clip_range,
+    xy_to_rc,
+)
 
 
 class CustomFootprint:
@@ -18,6 +22,7 @@ class CustomFootprint:
     Footprint object that is created using a ndarray of points. it will draw a hull around them, and collision
     check using the hull.
     """
+
     def __init__(self, footprint_points, angular_resolution, inflation_scale=1.0):
         """
         Define a footprint as the filled in hull of the points selected. The first point of the hull_points must
@@ -26,16 +31,21 @@ class CustomFootprint:
         :param angular_resolution float: radian resolution at which to precompute the hulls for
         :param inflation_scale float: scaling factor on the the footprint, inflating its size
         """
-        assert angular_resolution > 0.001 * np.pi / 180.\
-            and "too small resolution. " \
-                "should probably implement with degrees (no multiple of irrational numbers with degrees)"
+        assert (
+            angular_resolution > 0.001 * np.pi / 180.0
+            and "too small resolution. "
+            "should probably implement with degrees (no multiple of irrational numbers with degrees)"
+        )
 
         self._inflation_scale = inflation_scale
         self._footprint_points = footprint_points
         self._inflated_footprint_points = footprint_points * inflation_scale
         self._angular_resolution = angular_resolution
 
-        self._mask_angles, self._rotated_masks = self._precompute_rotated_footprint_points()
+        (
+            self._mask_angles,
+            self._rotated_masks,
+        ) = self._precompute_rotated_footprint_points()
         self._rotated_masks_set = dict()
         self._rotated_outline_coords_set = dict()
         self._mask_radius_set = dict()
@@ -45,18 +55,22 @@ class CustomFootprint:
         Returns a copy of the current footprint object
         :return CustomFootprint: a copy of the current object
         """
-        return CustomFootprint(footprint_points=self._footprint_points.copy(),
-                               angular_resolution=self._angular_resolution,
-                               inflation_scale=self._inflation_scale)
+        return CustomFootprint(
+            footprint_points=self._footprint_points.copy(),
+            angular_resolution=self._angular_resolution,
+            inflation_scale=self._inflation_scale,
+        )
 
     def no_inflation(self):
         """
         Returns a copy of the current footprint object but with no inflation.
         :return CustomFootprint: a copy of the current object but with no inflation.
         """
-        return CustomFootprint(footprint_points=self._footprint_points.copy(),
-                               angular_resolution=self._angular_resolution,
-                               inflation_scale=1.0)
+        return CustomFootprint(
+            footprint_points=self._footprint_points.copy(),
+            angular_resolution=self._angular_resolution,
+            inflation_scale=1.0,
+        )
 
     def _precompute_rotated_footprint_points(self, debug=False):
         """
@@ -66,7 +80,10 @@ class CustomFootprint:
         """
         rotation_angles = np.arange(-np.pi, np.pi, self._angular_resolution)
         # TODO WHY NOT get_rotation_matrix_2d(-angle))
-        rotated_hulls = [self._inflated_footprint_points.dot(get_rotation_matrix_2d(angle)) for angle in rotation_angles]
+        rotated_hulls = [
+            self._inflated_footprint_points.dot(get_rotation_matrix_2d(angle))
+            for angle in rotation_angles
+        ]
         if debug:
             for rotated_point in rotated_hulls:
                 plt.plot(rotated_point[:, 0], rotated_point[:, 1])
@@ -82,21 +99,32 @@ class CustomFootprint:
         :param debug bool: show debug plots?
         """
         # compute needed array size of the footprint mask
-        first_hull_px = np.ceil(self._rotated_masks[0] / resolution).astype(int)[:, ::-1]
+        first_hull_px = np.ceil(self._rotated_masks[0] / resolution).astype(int)[
+            :, ::-1
+        ]
 
         # add +1 to give a pixel footprint a minimum radius > 0
-        mask_radius = np.ceil(compute_circumscribed_radius(first_hull_px)).astype(int) + 1
+        mask_radius = (
+            np.ceil(compute_circumscribed_radius(first_hull_px)).astype(int) + 1
+        )
         mask_shape = np.array([2 * mask_radius + 1, 2 * mask_radius + 1])
-        ego_coord = np.floor(mask_shape / 2.).astype(int)
+        ego_coord = np.floor(mask_shape / 2.0).astype(int)
 
         # loop through all the rotated hulls, and rasterize them onto the mask
         rotated_footprint_masks = []
         rotated_outline_coords = []
         for i, rotated_hull in enumerate(self._rotated_masks):
-            rotated_hull_px = np.ceil(rotated_hull / resolution).astype(int)[:, ::-1] + ego_coord
+            rotated_hull_px = (
+                np.ceil(rotated_hull / resolution).astype(int)[:, ::-1] + ego_coord
+            )
             footprint_mask = -1 * np.ones(mask_shape)
-            cv2.drawContours(footprint_mask, [rotated_hull_px[:, ::-1]], contourIdx=0,
-                             color=Costmap.OCCUPIED, thickness=-1)
+            cv2.drawContours(
+                footprint_mask,
+                [rotated_hull_px[:, ::-1]],
+                contourIdx=0,
+                color=Costmap.OCCUPIED,
+                thickness=-1,
+            )
             rotated_footprint_masks.append(footprint_mask)
             rotated_outline_coords.append(rotated_hull_px - ego_coord)
             if debug and i % 10 == 0:
@@ -110,7 +138,14 @@ class CustomFootprint:
         self._rotated_outline_coords_set[resolution] = np.array(rotated_outline_coords)
         self._rotated_masks_set[resolution] = np.array(rotated_footprint_masks)
 
-    def check_for_collision(self, state, occupancy_map, unexplored_is_occupied=False, use_python=False, debug=False):
+    def check_for_collision(
+        self,
+        state,
+        occupancy_map,
+        unexplored_is_occupied=False,
+        use_python=False,
+        debug=False,
+    ):
         """
         using the state and the map, check for a collision on the map.
         :param state array(3)[float]: state of the robot [x, y, theta]
@@ -130,11 +165,15 @@ class CustomFootprint:
 
         if debug:
             map_vis = occupancy_map.copy()
-            map_vis.data = np.repeat([occupancy_map.data], repeats=3, axis=0).transpose((1, 2, 0)).copy()
+            map_vis.data = (
+                np.repeat([occupancy_map.data], repeats=3, axis=0)
+                .transpose((1, 2, 0))
+                .copy()
+            )
             self.draw(rc_to_xy(state_px, occupancy_map), map_vis, [255, 10, 10])
             occupied_inds = np.argwhere(occupancy_map.data == Costmap.OCCUPIED)
             map_vis.data[occupied_inds[:, 0], occupied_inds[:, 1]] = [0, 0, 0]
-            plt.imshow(map_vis.data, interpolation='nearest')
+            plt.imshow(map_vis.data, interpolation="nearest")
             plt.show()
 
         # get the mask radius that was saved for this resolution
@@ -142,21 +181,35 @@ class CustomFootprint:
 
         # compute the closest angle to the current angle in the state, and get that rotated footprint
         closest_angle_ind = np.argmin(np.abs(state_px[2] - self._mask_angles))
-        footprint_mask = self._rotated_masks_set[occupancy_map.resolution][closest_angle_ind]
-        outline_coords = self._rotated_outline_coords_set[occupancy_map.resolution][closest_angle_ind]
+        footprint_mask = self._rotated_masks_set[occupancy_map.resolution][
+            closest_angle_ind
+        ]
+        outline_coords = self._rotated_outline_coords_set[occupancy_map.resolution][
+            closest_angle_ind
+        ]
 
         if not use_python:
-            obstacle_values = [Costmap.OCCUPIED, Costmap.UNEXPLORED] if unexplored_is_occupied else [Costmap.OCCUPIED]
+            obstacle_values = (
+                [Costmap.OCCUPIED, Costmap.UNEXPLORED]
+                if unexplored_is_occupied
+                else [Costmap.OCCUPIED]
+            )
 
-            is_colliding = check_for_collision(state,
-                                               occupancy_map,
-                                               footprint_mask=footprint_mask,
-                                               outline_coords=outline_coords,
-                                               obstacle_values=obstacle_values)
+            is_colliding = check_for_collision(
+                state,
+                occupancy_map,
+                footprint_mask=footprint_mask,
+                outline_coords=outline_coords,
+                obstacle_values=obstacle_values,
+            )
         else:
             # part of robot off the edge of map, it is a collision, because we assume map is bounded
-            if not np.all(which_coords_in_bounds(coords=(outline_coords + state_px[:2]).astype(int),
-                                                 map_shape=occupancy_map.get_shape())):
+            if not np.all(
+                which_coords_in_bounds(
+                    coords=(outline_coords + state_px[:2]).astype(int),
+                    map_shape=occupancy_map.get_shape(),
+                )
+            ):
                 return True
 
             # get a small subsection around the state in the map (as big as our mask),
@@ -165,17 +218,23 @@ class CustomFootprint:
             # to reflect this, in both the subsection and the mask
             min_range = [position[0] - mask_radius, position[1] - mask_radius]
             max_range = [position[0] + mask_radius + 1, position[1] + mask_radius + 1]
-            clipped_min_range, clipped_max_range = clip_range(min_range, max_range, occupancy_map.data.shape)
+            clipped_min_range, clipped_max_range = clip_range(
+                min_range, max_range, occupancy_map.data.shape
+            )
 
             min_range_delta = clipped_min_range - np.array(min_range)
             max_range_delta = clipped_max_range - np.array(max_range)
 
-            ego_map = occupancy_map.data[clipped_min_range[0]:clipped_max_range[0],
-                                         clipped_min_range[1]:clipped_max_range[1]].copy()
+            ego_map = occupancy_map.data[
+                clipped_min_range[0] : clipped_max_range[0],
+                clipped_min_range[1] : clipped_max_range[1],
+            ].copy()
 
             # todo might be - max_range_delta
-            footprint_mask = footprint_mask[min_range_delta[0]:footprint_mask.shape[1] + max_range_delta[0],
-                                            min_range_delta[1]:footprint_mask.shape[1] + max_range_delta[1]]
+            footprint_mask = footprint_mask[
+                min_range_delta[0] : footprint_mask.shape[1] + max_range_delta[0],
+                min_range_delta[1] : footprint_mask.shape[1] + max_range_delta[1],
+            ]
 
             # treat unexplored space as obstacle
             if unexplored_is_occupied:
@@ -197,16 +256,29 @@ class CustomFootprint:
         :param color Union[int, array(3)[uint8]]: color based on the dimensionality of the map.data, if map.data is MxNx3 a rgb i.e [255, 0, 0]
                       must be given, otherwise if it is a MxN, then a grayscale value must be given, i.e 70
         """
-        if visualization_map.resolution not in list(self._rotated_outline_coords_set.keys()):
+        if visualization_map.resolution not in list(
+            self._rotated_outline_coords_set.keys()
+        ):
             self._add_new_masks(visualization_map.resolution)
 
         state_px = xy_to_rc(state, visualization_map)
         # TODO WHY NOT -state_px[2]
         closest_angle_ind = int(np.argmin(np.abs(state_px[2] - self._mask_angles)))
 
-        rotated_hull_px = self._rotated_outline_coords_set[visualization_map.resolution][closest_angle_ind] / self._inflation_scale
+        rotated_hull_px = (
+            self._rotated_outline_coords_set[visualization_map.resolution][
+                closest_angle_ind
+            ]
+            / self._inflation_scale
+        )
         rotated_hull_px = (rotated_hull_px + state_px[:2]).astype(int)
-        cv2.drawContours(visualization_map.data, [rotated_hull_px[:, ::-1]], contourIdx=0, color=color, thickness=-1)
+        cv2.drawContours(
+            visualization_map.data,
+            [rotated_hull_px[:, ::-1]],
+            contourIdx=0,
+            color=color,
+            thickness=-1,
+        )
 
     def get_ego_points(self, angle, resolution):
         """
@@ -220,10 +292,15 @@ class CustomFootprint:
 
         mask_radius = self._mask_radius_set[resolution]
         mask_shape = np.array([2 * mask_radius + 1, 2 * mask_radius + 1])
-        ego_center = np.floor(mask_shape / 2.).astype(int)
+        ego_center = np.floor(mask_shape / 2.0).astype(int)
         closest_angle_ind = int(np.argmin(np.abs(angle - self._mask_angles)))
-        ego_coords = np.argwhere(self._rotated_masks_set[resolution][closest_angle_ind] == Costmap.OCCUPIED)\
+        ego_coords = (
+            np.argwhere(
+                self._rotated_masks_set[resolution][closest_angle_ind]
+                == Costmap.OCCUPIED
+            )
             - ego_center
+        )
         return resolution * ego_coords
 
     def get_outline_points(self, angle, resolution):
@@ -237,7 +314,9 @@ class CustomFootprint:
             self._add_new_masks(resolution)
 
         closest_angle_ind = int(np.argmin(np.abs(angle - self._mask_angles)))
-        return resolution * self._rotated_outline_coords_set[resolution][closest_angle_ind]
+        return (
+            resolution * self._rotated_outline_coords_set[resolution][closest_angle_ind]
+        )
 
     def get_clearing_points(self, resolution):
         """
@@ -250,9 +329,15 @@ class CustomFootprint:
 
         mask_radius = self._mask_radius_set[resolution] + 1
         mask_shape = np.array([2 * mask_radius + 1, 2 * mask_radius + 1])
-        ego_coord = np.floor(mask_shape / 2.).astype(int)
+        ego_coord = np.floor(mask_shape / 2.0).astype(int)
         mask = np.zeros(mask_shape)
-        cv2.circle(mask, center=tuple(ego_coord[::-1]), radius=mask_radius, color=1, thickness=-1)
+        cv2.circle(
+            mask,
+            center=tuple(ego_coord[::-1]),
+            radius=mask_radius,
+            color=1,
+            thickness=-1,
+        )
         return resolution * (np.argwhere(mask == 1) - ego_coord)
 
     def get_footprint_masks(self, resolution, angles=None):
@@ -267,8 +352,13 @@ class CustomFootprint:
             self._add_new_masks(resolution)
 
         if angles is not None:
-            angle_inds = np.argmin(np.abs(np.expand_dims(angles, axis=1) -
-                                          np.expand_dims(self._mask_angles, axis=0)), axis=1)
+            angle_inds = np.argmin(
+                np.abs(
+                    np.expand_dims(angles, axis=1)
+                    - np.expand_dims(self._mask_angles, axis=0)
+                ),
+                axis=1,
+            )
             return self._rotated_masks_set[resolution][angle_inds]
         else:
             return self._rotated_masks_set[resolution]
@@ -284,8 +374,13 @@ class CustomFootprint:
             self._add_new_masks(resolution)
 
         if angles is not None:
-            angle_inds = np.argmin(np.abs(np.expand_dims(angles, axis=1) -
-                                          np.expand_dims(self._mask_angles, axis=0)), axis=1)
+            angle_inds = np.argmin(
+                np.abs(
+                    np.expand_dims(angles, axis=1)
+                    - np.expand_dims(self._mask_angles, axis=0)
+                ),
+                axis=1,
+            )
             return self._rotated_outline_coords_set[resolution][angle_inds]
         else:
             return self._rotated_outline_coords_set[resolution]

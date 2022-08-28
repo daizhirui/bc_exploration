@@ -25,6 +25,7 @@ class Cell:
     """
     Building block for the gui grid. It can visualize itself, and toggle filled, not filled
     """
+
     FILLED_COLOR_BG = "black"
     EMPTY_COLOR_BG = "white"
     FILLED_COLOR_BORDER = "black"
@@ -63,18 +64,26 @@ class Cell:
                 border_color = Cell.FILLED_COLOR_BORDER
 
             cell_range_row = (self.row * self.size, self.row * self.size + self.size)
-            cell_range_col = (self.column * self.size, self.column * self.size + self.size)
+            cell_range_col = (
+                self.column * self.size,
+                self.column * self.size + self.size,
+            )
 
-            self.window.create_rectangle(cell_range_col[0], cell_range_row[0],
-                                         cell_range_col[1], cell_range_row[1],
-                                         fill=background_color,
-                                         outline=border_color)
+            self.window.create_rectangle(
+                cell_range_col[0],
+                cell_range_row[0],
+                cell_range_col[1],
+                cell_range_row[1],
+                fill=background_color,
+                outline=border_color,
+            )
 
 
 class Grid(Canvas):  # pylint: disable=too-many-ancestors
     """
     Grid object that will allow drawing on it by changing the underlying cell values
     """
+
     def __init__(self, window, num_rows, num_columns, cell_size):
         """
         Defines a grid-like composition of cells, visualizable editable grid for drawing maps
@@ -83,10 +92,12 @@ class Grid(Canvas):  # pylint: disable=too-many-ancestors
         :param num_columns int: number of columns desired
         :param cell_size int: the size in px the cell should take on the screen
         """
-        Canvas.__init__(self,
-                        master=window,
-                        width=cell_size * num_columns,
-                        height=cell_size * num_rows)
+        Canvas.__init__(
+            self,
+            master=window,
+            width=cell_size * num_columns,
+            height=cell_size * num_rows,
+        )
 
         self.num_columns = num_columns
         self.num_rows = num_rows
@@ -98,9 +109,13 @@ class Grid(Canvas):  # pylint: disable=too-many-ancestors
             row = []
             for c in range(num_columns):
                 if r == 0 or r == num_rows - 1 or c == 0 or c == num_columns - 1:
-                    row.append(Cell(self, row=r, column=c, size=cell_size, is_filled=True))
+                    row.append(
+                        Cell(self, row=r, column=c, size=cell_size, is_filled=True)
+                    )
                 else:
-                    row.append(Cell(self, row=r, column=c, size=cell_size, is_filled=False))
+                    row.append(
+                        Cell(self, row=r, column=c, size=cell_size, is_filled=False)
+                    )
             self.grid.append(row)
 
         self.switched = []
@@ -185,7 +200,7 @@ class Grid(Canvas):  # pylint: disable=too-many-ancestors
         cv2.imwrite(filename, np.array(occupany_map))
 
 
-def save_button_callback(grid, entry, directory='.'):
+def save_button_callback(grid, entry, directory="."):
     """
     Callback for the save button
     :param grid Grid: grid object
@@ -203,7 +218,7 @@ def save_button_callback(grid, entry, directory='.'):
     grid.save(os.path.join(directory, filename))
 
 
-def make_map(num_rows, num_columns, cell_size, save_dir='.'):
+def make_map(num_rows, num_columns, cell_size, save_dir="."):
     """
     Main interface for making a map
     :param num_rows int: number of rows desired
@@ -221,25 +236,32 @@ def make_map(num_rows, num_columns, cell_size, save_dir='.'):
     text_field = Entry(app, text="")
     text_field.pack(side=LEFT, fill=X, expand=True)
 
-    save_button = Button(app, text="Save", command=partial(save_button_callback,
-                                                           grid=grid,
-                                                           entry=text_field,
-                                                           directory=save_dir))
+    save_button = Button(
+        app,
+        text="Save",
+        command=partial(
+            save_button_callback, grid=grid, entry=text_field, directory=save_dir
+        ),
+    )
     save_button.pack(side=LEFT)
 
     app.mainloop()
 
 
 # todo add load and edit and view
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Process some integers.')
-    parser.add_argument('-num_rows', type=int, help='number of rows', default=11)
-    parser.add_argument('-num_columns', type=int, help='number of columns', default=11)
-    parser.add_argument('-cell_size', type=int, help='cell size in pixels', default=30)
-    parser.add_argument('-save_dir', type=str, help='cell size in pixels',
-                        default=get_maps_dir())
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Process some integers.")
+    parser.add_argument("-num_rows", type=int, help="number of rows", default=11)
+    parser.add_argument("-num_columns", type=int, help="number of columns", default=11)
+    parser.add_argument("-cell_size", type=int, help="cell size in pixels", default=30)
+    parser.add_argument(
+        "-save_dir", type=str, help="cell size in pixels", default=get_maps_dir()
+    )
 
     args = parser.parse_args()
-    make_map(num_rows=args.num_rows,
-             num_columns=args.num_columns,
-             cell_size=args.cell_size, save_dir=args.save_dir)
+    make_map(
+        num_rows=args.num_rows,
+        num_columns=args.num_columns,
+        cell_size=args.cell_size,
+        save_dir=args.save_dir,
+    )

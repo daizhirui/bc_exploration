@@ -8,7 +8,11 @@ from __future__ import print_function, absolute_import, division
 import cv2
 import numpy as np
 from bc_exploration.mapping.costmap import Costmap
-from bc_exploration.utilities.util import wrap_angles, compute_connected_pixels, rc_to_xy
+from bc_exploration.utilities.util import (
+    wrap_angles,
+    compute_connected_pixels,
+    rc_to_xy,
+)
 from bc_exploration.utilities.util import xy_to_rc
 
 
@@ -18,14 +22,16 @@ class GridWorld:
     Map must be a image file whose values represent free (255, white), occupied (0, black).
     """
 
-    def __init__(self,
-                 map_filename,
-                 map_resolution,
-                 sensor,
-                 footprint,
-                 start_state=None,
-                 map_padding=0.,
-                 render_size=(500, 500)):
+    def __init__(
+        self,
+        map_filename,
+        map_resolution,
+        sensor,
+        footprint,
+        start_state=None,
+        map_padding=0.0,
+        render_size=(500, 500),
+    ):
         """
         Creates an interactive grid world environment structured similar to open ai gym.
         Allows for moving, sensing, and visualizing within the space. Map loaded is based off the map_filename.
@@ -45,7 +51,11 @@ class GridWorld:
         self._map_resolution = map_resolution
         self._map_padding = map_padding
 
-        assert render_size.shape[0] == 2 if isinstance(render_size, np.ndarray) else len(render_size) == 2
+        assert (
+            render_size.shape[0] == 2
+            if isinstance(render_size, np.ndarray)
+            else len(render_size) == 2
+        )
         self._render_size = render_size
 
         self._state = None
@@ -56,8 +66,11 @@ class GridWorld:
 
         self._load_map(map_filename, map_resolution, map_padding)
 
-        self._start_state = np.array(start_state).astype(float) \
-            if start_state is not None else self.get_random_start_state()
+        self._start_state = (
+            np.array(start_state).astype(float)
+            if start_state is not None
+            else self.get_random_start_state()
+        )
         assert self._start_state.shape[0] == 3
 
         # shift start state to be [0., 0.]
@@ -107,12 +120,23 @@ class GridWorld:
         :param map_resolution float: desired resolution of the loaded map
         """
         map_data = cv2.imread(filename)
-        assert map_data is not None and "map file not able to be loaded. Does the file exist?"
+        assert (
+            map_data is not None
+            and "map file not able to be loaded. Does the file exist?"
+        )
         map_data = cv2.cvtColor(map_data, cv2.COLOR_RGB2GRAY)
         map_data = map_data.astype(np.uint8)
-        assert [value in [Costmap.FREE, Costmap.UNEXPLORED, Costmap.OCCUPIED] for value in np.unique(map_data)]
-        map_data = np.pad(array=map_data, pad_width=int(np.rint(map_padding / map_resolution)), mode='constant', constant_values=Costmap.OCCUPIED)
-        self._map = Costmap(data=map_data, resolution=map_resolution, origin=[0., 0.])
+        assert [
+            value in [Costmap.FREE, Costmap.UNEXPLORED, Costmap.OCCUPIED]
+            for value in np.unique(map_data)
+        ]
+        map_data = np.pad(
+            array=map_data,
+            pad_width=int(np.rint(map_padding / map_resolution)),
+            mode="constant",
+            constant_values=Costmap.OCCUPIED,
+        )
+        self._map = Costmap(data=map_data, resolution=map_resolution, origin=[0.0, 0.0])
 
     def compare_maps(self, occupancy_map):
         """
@@ -182,12 +206,14 @@ class GridWorld:
         # cv2.circle(map_vis, tuple(self.state[:2][::-1].astype(int)), 1, [127, 122, 10], thickness=-1)
 
         # resize map
-        map_vis = cv2.resize(map_vis, tuple(self._render_size), interpolation=cv2.INTER_NEAREST)
+        map_vis = cv2.resize(
+            map_vis, tuple(self._render_size), interpolation=cv2.INTER_NEAREST
+        )
 
         # visualize map
-        cv2.namedWindow('map', cv2.WINDOW_GUI_NORMAL)
-        cv2.imshow('map', map_vis)
-        cv2.resizeWindow('map', *self._render_size)
+        cv2.namedWindow("map", cv2.WINDOW_GUI_NORMAL)
+        cv2.imshow("map", map_vis)
+        cv2.resizeWindow("map", *self._render_size)
         cv2.waitKey(wait_key)
 
     def get_sensor(self):

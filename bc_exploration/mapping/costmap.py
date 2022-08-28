@@ -19,6 +19,7 @@ class Costmap:
     also the values are different because it makes visualization 10x easier,
     also when saving the map it looks like a map
     """
+
     FREE = 255
     OCCUPIED = 0
     UNEXPLORED = 127
@@ -65,9 +66,9 @@ class Costmap:
         :param render_size Tuple(int): size to render the visualization window
         :param wait_key int: opencv wait key for visualization
         """
-        cv2.namedWindow('map.visualize', cv2.WINDOW_GUI_NORMAL)
-        cv2.imshow('map.visualize', self.data)
-        cv2.resizeWindow('map.visualize', *render_size)
+        cv2.namedWindow("map.visualize", cv2.WINDOW_GUI_NORMAL)
+        cv2.imshow("map.visualize", self.data)
+        cv2.resizeWindow("map.visualize", *render_size)
         cv2.waitKey(wait_key)
 
     def get_downscaled(self, desired_resolution):
@@ -81,22 +82,40 @@ class Costmap:
         scaled_shape = np.rint(np.array(self.data.shape) * scale_factor).astype(int)
         scaled_data = np.zeros(scaled_shape)
 
-        scaled_occupied_coords = np.rint(np.argwhere(self.data == Costmap.OCCUPIED) * scale_factor).astype(int)
-        scaled_unexplored_coords = np.rint(np.argwhere(self.data == Costmap.UNEXPLORED) * scale_factor).astype(int)
-        scaled_free_coords = np.rint(np.argwhere(self.data == Costmap.FREE) * scale_factor).astype(int)
+        scaled_occupied_coords = np.rint(
+            np.argwhere(self.data == Costmap.OCCUPIED) * scale_factor
+        ).astype(int)
+        scaled_unexplored_coords = np.rint(
+            np.argwhere(self.data == Costmap.UNEXPLORED) * scale_factor
+        ).astype(int)
+        scaled_free_coords = np.rint(
+            np.argwhere(self.data == Costmap.FREE) * scale_factor
+        ).astype(int)
 
-        scaled_occupied_coords = scaled_occupied_coords[which_coords_in_bounds(scaled_occupied_coords, scaled_shape)]
-        scaled_unexplored_coords = scaled_unexplored_coords[which_coords_in_bounds(scaled_unexplored_coords, scaled_shape)]
-        scaled_free_coords = scaled_free_coords[which_coords_in_bounds(scaled_free_coords, scaled_shape)]
+        scaled_occupied_coords = scaled_occupied_coords[
+            which_coords_in_bounds(scaled_occupied_coords, scaled_shape)
+        ]
+        scaled_unexplored_coords = scaled_unexplored_coords[
+            which_coords_in_bounds(scaled_unexplored_coords, scaled_shape)
+        ]
+        scaled_free_coords = scaled_free_coords[
+            which_coords_in_bounds(scaled_free_coords, scaled_shape)
+        ]
 
         # order is important here, we want to make sure to keep the obstacles
         scaled_data[scaled_free_coords[:, 0], scaled_free_coords[:, 1]] = Costmap.FREE
-        scaled_data[scaled_unexplored_coords[:, 0], scaled_unexplored_coords[:, 1]] = Costmap.UNEXPLORED
-        scaled_data[scaled_occupied_coords[:, 0], scaled_occupied_coords[:, 1]] = Costmap.OCCUPIED
+        scaled_data[
+            scaled_unexplored_coords[:, 0], scaled_unexplored_coords[:, 1]
+        ] = Costmap.UNEXPLORED
+        scaled_data[
+            scaled_occupied_coords[:, 0], scaled_occupied_coords[:, 1]
+        ] = Costmap.OCCUPIED
 
-        return Costmap(data=scaled_data.astype(np.uint8),
-                       resolution=desired_resolution,
-                       origin=self.origin)
+        return Costmap(
+            data=scaled_data.astype(np.uint8),
+            resolution=desired_resolution,
+            origin=self.origin,
+        )
 
     def save(self, filename):
         """
@@ -112,15 +131,26 @@ class Costmap:
         :return CostMap2D: brain formatted costmap
         """
         costmap_data = self.data.copy()
-        costmap_data[self.data == Costmap.FREE] = CostMap2D.FREE_SPACE  # pylint: disable=undefined-variable
-        costmap_data[self.data == Costmap.OCCUPIED] = CostMap2D.LETHAL_OBSTACLE  # pylint: disable=undefined-variable
-        costmap_data[self.data == Costmap.UNEXPLORED] = CostMap2D.NO_INFORMATION  # pylint: disable=undefined-variable
+        costmap_data[
+            self.data == Costmap.FREE
+        ] = CostMap2D.FREE_SPACE  # pylint: disable=undefined-variable
+        costmap_data[
+            self.data == Costmap.OCCUPIED
+        ] = CostMap2D.LETHAL_OBSTACLE  # pylint: disable=undefined-variable
+        costmap_data[
+            self.data == Costmap.UNEXPLORED
+        ] = CostMap2D.NO_INFORMATION  # pylint: disable=undefined-variable
 
-        return CostMap2D(data=np.flipud(costmap_data), resolution=self.resolution,  # pylint: disable=undefined-variable
-                         origin=self.origin.astype(np.float64))
+        return CostMap2D(
+            data=np.flipud(costmap_data),
+            resolution=self.resolution,  # pylint: disable=undefined-variable
+            origin=self.origin.astype(np.float64),
+        )
 
     @staticmethod
-    def from_brain_costmap(brain_costmap):  # pylint: disable=extra-argument-docstring, undefined-variable
+    def from_brain_costmap(
+        brain_costmap,
+    ):  # pylint: disable=extra-argument-docstring, undefined-variable
         """
         Convert a brain CostMap2D object to a Costmap object. We need to remove the padding that is given, and
         change the values to Costmap format
@@ -133,10 +163,20 @@ class Costmap:
         brain_costmap_data = np.flipud(brain_costmap_data)
 
         costmap_data = brain_costmap_data.copy()
-        costmap_data[brain_costmap_data == CostMap2D.FREE_SPACE] = Costmap.FREE  # pylint: disable=undefined-variable
-        costmap_data[brain_costmap_data == CostMap2D.LETHAL_OBSTACLE] = Costmap.OCCUPIED  # pylint: disable=undefined-variable
-        costmap_data[brain_costmap_data == 100] = Costmap.OCCUPIED  # another brain occupied value
-        costmap_data[brain_costmap_data == CostMap2D.NO_INFORMATION] = Costmap.UNEXPLORED  # pylint: disable=undefined-variable
-        return Costmap(data=costmap_data,
-                       resolution=brain_costmap_resolution,
-                       origin=brain_costmap.get_origin())
+        costmap_data[
+            brain_costmap_data == CostMap2D.FREE_SPACE
+        ] = Costmap.FREE  # pylint: disable=undefined-variable
+        costmap_data[
+            brain_costmap_data == CostMap2D.LETHAL_OBSTACLE
+        ] = Costmap.OCCUPIED  # pylint: disable=undefined-variable
+        costmap_data[
+            brain_costmap_data == 100
+        ] = Costmap.OCCUPIED  # another brain occupied value
+        costmap_data[
+            brain_costmap_data == CostMap2D.NO_INFORMATION
+        ] = Costmap.UNEXPLORED  # pylint: disable=undefined-variable
+        return Costmap(
+            data=costmap_data,
+            resolution=brain_costmap_resolution,
+            origin=brain_costmap.get_origin(),
+        )

@@ -8,13 +8,20 @@ from matplotlib import pyplot as plt
 
 from bc_exploration.mapping.costmap import Costmap
 from bc_exploration.sensors.sensor_util import bresenham2d
-from bc_exploration.utilities.util import wrap_angles, which_coords_in_bounds, xy_to_rc, scan_to_points, get_rotation_matrix_2d
+from bc_exploration.utilities.util import (
+    wrap_angles,
+    which_coords_in_bounds,
+    xy_to_rc,
+    scan_to_points,
+    get_rotation_matrix_2d,
+)
 
 
 class Sensor:
     """
     Sensor base class
     """
+
     def __init__(self, sensor_range):
         """
         Base class for a variety of sensors.
@@ -51,6 +58,7 @@ class Neighborhood(Sensor):
     """
     Gives a NxN square of information around the robot.
     """
+
     def __init__(self, sensor_range, values=(0, 255)):
         """
         Neighboorhood sensor, ignores obstacles
@@ -78,24 +86,35 @@ class Neighborhood(Sensor):
         :return array(N,2)[int]: ego coordinates corresponding to self.values in the costmap
         """
         if self._map is None or self._range_px is None:
-            assert False and "Sensor's map is not currently set, please initialize with set_map()," \
-                             " the set_map() function should initialize map and range_px"
+            assert (
+                False
+                and "Sensor's map is not currently set, please initialize with set_map(),"
+                " the set_map() function should initialize map and range_px"
+            )
 
         state = xy_to_rc(state, self._map)
-        pad_map = np.pad(self._map.data.copy(), pad_width=self._range_px, mode='constant', constant_values=0)
+        pad_map = np.pad(
+            self._map.data.copy(),
+            pad_width=self._range_px,
+            mode="constant",
+            constant_values=0,
+        )
 
         min_range = np.array([state[0], state[1]]).astype(int)
-        max_range = np.array([state[0] + 2 * self._range_px, state[1] + 2 * self._range_px]).astype(int)
+        max_range = np.array(
+            [state[0] + 2 * self._range_px, state[1] + 2 * self._range_px]
+        ).astype(int)
 
-        ego_map = pad_map[min_range[0]:max_range[0] + 1,
-                          min_range[1]:max_range[1] + 1]
+        ego_map = pad_map[
+            min_range[0] : max_range[0] + 1, min_range[1] : max_range[1] + 1
+        ]
 
         ego_state = np.array([self._range_px, self._range_px])
 
         if debug:
             vis_map = ego_map.copy()
             vis_map[ego_state[0], ego_state[1]] = 75
-            plt.imshow(vis_map, cmap='gray')
+            plt.imshow(vis_map, cmap="gray")
             plt.show()
 
         coords = []
@@ -103,7 +122,12 @@ class Neighborhood(Sensor):
             value_coords = np.argwhere(ego_map == value) - ego_state + min_range
             x = value_coords[:, 0]
             y = value_coords[:, 1]
-            is_valid = (x >= 0) & (x < self._map.data.shape[0]) & (y >= 0) & (y < self._map.data.shape[1])
+            is_valid = (
+                (x >= 0)
+                & (x < self._map.data.shape[0])
+                & (y >= 0)
+                & (y < self._map.data.shape[1])
+            )
             # is_valid = np.logical_and(np.all(value_coords >= 0, axis=1),
             #                           np.logical_and(value_coords[:, 0] < self._map.data.shape[0],
             #                                          value_coords[:, 1] < self._map.data.shape[1]))
@@ -117,7 +141,10 @@ class Laser(Sensor):
     """
     Python lidar implementation
     """
-    def __init__(self, sensor_range, map_resolution, angle_range=(-45, 45), angle_increment=1):
+
+    def __init__(
+        self, sensor_range, map_resolution, angle_range=(-45, 45), angle_increment=1
+    ):
         """
         Python implementation of a lidar
         :param sensor_range float: range of sensor in meters
@@ -143,13 +170,21 @@ class Laser(Sensor):
 
         # we define - to be left of y axis and + to be right of y axis, and y axis to be 0 degrees
         # todo change this to brains format 0 degrees right neg down pos up
-        range_points = self.range_px * np.vstack(([-np.cos(angles * np.pi / 180)], [np.sin(angles * np.pi / 180)])).T
+        range_points = (
+            self.range_px
+            * np.vstack(
+                ([-np.cos(angles * np.pi / 180)], [np.sin(angles * np.pi / 180)])
+            ).T
+        )
         circle_coords = np.round(range_points).astype(int)
         if debug:
             plt.scatter(circle_coords[:, 0], circle_coords[:, 1])
             plt.show()
 
-        circle_rays = [bresenham2d([0, 0], circle_coord).astype(int) for circle_coord in circle_coords.tolist()]
+        circle_rays = [
+            bresenham2d([0, 0], circle_coord).astype(int)
+            for circle_coord in circle_coords.tolist()
+        ]
 
         return angles, circle_rays
 
@@ -167,12 +202,20 @@ class Laser(Sensor):
         if shifted_angle_range[1] == -180:
             shifted_angle_range[1] *= -1
 
-        desired_angles = wrap_angles(np.arange(shifted_angle_range[0],
-                                               shifted_angle_range[1] + self.angle_increment,
-                                               self.angle_increment), is_radians=False)
+        desired_angles = wrap_angles(
+            np.arange(
+                shifted_angle_range[0],
+                shifted_angle_range[1] + self.angle_increment,
+                self.angle_increment,
+            ),
+            is_radians=False,
+        )
 
-        state_rays = [(circle_ray + state[:2]).astype(int) for i, circle_ray in enumerate(self.circle_rays)
-                      if self.ray_angles[i] in desired_angles]
+        state_rays = [
+            np.round(circle_ray + state[:2]).astype(int)
+            for i, circle_ray in enumerate(self.circle_rays)
+            if self.ray_angles[i] in desired_angles
+        ]
 
         return state_rays
 
@@ -184,14 +227,19 @@ class Laser(Sensor):
         :return Union[array(N,2)[int], array(N,2)[int]]: ego occupied, ego free coordinates
         """
         if self._map is None:
-            assert False and "Sensor's map is not currently set, please initialize with set_map()"
+            assert (
+                False
+                and "Sensor's map is not currently set, please initialize with set_map()"
+            )
 
         state_rays = self._compute_state_rays(state)
 
         # remove ray points that are out of bounds
         rays = []
         for state_ray in state_rays:
-            in_bound_point_inds = which_coords_in_bounds(state_ray, map_shape=self._map.data.shape)
+            in_bound_point_inds = which_coords_in_bounds(
+                state_ray, map_shape=self._map.data.shape
+            )
             rays.append(state_ray[in_bound_point_inds])
 
         if debug:
@@ -214,14 +262,21 @@ class Laser(Sensor):
             else:
                 free.extend(ray)
 
-        return [np.array(occupied) - state[:2].astype(int) if len(occupied) else np.empty((0,)),
-                np.array(free) - state[:2].astype(int) if len(free) else np.empty((0,))]
+        return [
+            np.round(np.array(occupied) - state[:2]).astype(int)
+            if len(occupied)
+            else np.empty((0,)),
+            np.round(np.array(free) - state[:2]).astype(int)
+            if len(free)
+            else np.empty((0,)),
+        ]
 
 
 class Lidar(Sensor):
     """
     Lidar sensor that conforms to the Sensor class
     """
+
     def __init__(self, sensor_range, angular_range, angular_resolution, map_resolution):
         """
         Realistic lidar.
@@ -242,11 +297,20 @@ class Lidar(Sensor):
         Precomputes the angles and rays in ego coordinates of the lidar.
         :return Tuple[array(N)[float], array(N, 2)[float]]: the lidar angles, ray ego coords
         """
-        angles = np.arange(-self._angular_range / 2, self._angular_range / 2 + self._angular_resolution, self._angular_resolution)
+        angles = np.arange(
+            -self._angular_range / 2,
+            self._angular_range / 2 + self._angular_resolution,
+            self._angular_resolution,
+        )
 
         ray_points = self._range * np.array([np.cos(angles), np.sin(angles)]).T
-        ray_points_px = np.rint(ray_points / self._map_resolution).astype(int)[:, ::-1] * [-1, 1]
-        ego_rays = [bresenham2d([0, 0], ray_point_px).astype(int) for ray_point_px in ray_points_px]
+        ray_points_px = np.rint(ray_points / self._map_resolution).astype(int)[
+            :, ::-1
+        ] * [-1, 1]
+        ego_rays = [
+            bresenham2d([0, 0], ray_point_px).astype(int)
+            for ray_point_px in ray_points_px
+        ]
 
         return angles, ego_rays
 
@@ -264,8 +328,10 @@ class Lidar(Sensor):
         :param debug bool: show debug plot?
         :return Tuple[array(N)[float], array(N)[float]]: [lidar angles radians, lidar ranges meters] if ray did not hit obstacle, value is np.nan
         """
-        assert self._map is not None \
-               and "Please set the map using set_map() before calling measure, this will initialize lidar as well."
+        assert (
+            self._map is not None
+            and "Please set the map using set_map() before calling measure, this will initialize lidar as well."
+        )
 
         pose = state.copy()
         pose_px = xy_to_rc(pose, self._map)
@@ -283,14 +349,20 @@ class Lidar(Sensor):
             # else:
             #     ranges[i] = np.nan
             try:
-                occupied_ind = self._map.data[ray[:, 0], ray[:, 1]].tolist().index(Costmap.OCCUPIED)
-                ranges[i] = np.linalg.norm(pose_px[:2] - ray[int(occupied_ind)]) * self._map.resolution
+                occupied_ind = (
+                    self._map.data[ray[:, 0], ray[:, 1]]
+                    .tolist()
+                    .index(Costmap.OCCUPIED)
+                )
+                ranges[i] = (
+                    np.linalg.norm(pose_px[:2] - ray[int(occupied_ind)])
+                    * self._map.resolution
+                )
             except ValueError:
                 ranges[i] = np.nan
 
         if debug:
-            points = scan_to_points(self._ray_angles + state[2],
-                                    ranges) + pose_px[:2]
+            points = scan_to_points(self._ray_angles + state[2], ranges) + pose_px[:2]
             plt.plot(points[:, 0], points[:, 1])
             plt.show()
 

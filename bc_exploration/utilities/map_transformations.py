@@ -32,8 +32,10 @@ def convert_brain_map_to_map(filename, debug=False):
     gray_image[gray_image == 226] = 0
 
     if debug:
-        plt.imshow(gray_image, cmap='gray', interpolation='nearest')
+        plt.imshow(gray_image, cmap="gray", interpolation="nearest")
         plt.show()
     else:
-        save_path = get_exploration_dir() + "/maps/" + os.path.basename(filename[:-4]) + ".png"
+        save_path = (
+            get_exploration_dir() + "/maps/" + os.path.basename(filename[:-4]) + ".png"
+        )
         cv2.imwrite(save_path, gray_image)

@@ -6,10 +6,21 @@ from __future__ import print_function, absolute_import, division
 import cv2
 import numpy as np
 
-from bc_exploration.utilities.util import which_coords_in_bounds, xy_to_rc, scan_to_points
+from bc_exploration.utilities.util import (
+    which_coords_in_bounds,
+    xy_to_rc,
+    scan_to_points,
+)
 
 
-def draw_footprint_path(footprint, path, visualization_map, footprint_color=None, path_color=None, footprint_thickness=1):
+def draw_footprint_path(
+    footprint,
+    path,
+    visualization_map,
+    footprint_color=None,
+    path_color=None,
+    footprint_thickness=1,
+):
     """
     Draws the path specified on the map, overlaying footprints on each pose.
     :param footprint CustomFootprint: footprint to draw
@@ -23,17 +34,31 @@ def draw_footprint_path(footprint, path, visualization_map, footprint_color=None
     """
     path_px = xy_to_rc(path, visualization_map)
     if path_color is not None:
-        visualization_map.data[path_px[:, 0].astype(int), path_px[:, 1].astype(int)] = path_color
+        visualization_map.data[
+            path_px[:, 0].astype(int), path_px[:, 1].astype(int)
+        ] = path_color
 
     if footprint_color is not None:
         actual_footprint = footprint.no_inflation()
-        outline_coords = np.array(actual_footprint.get_outline_coords(visualization_map.resolution))
+        outline_coords = np.array(
+            actual_footprint.get_outline_coords(visualization_map.resolution)
+        )
         angles = footprint.get_mask_angles()
-        angle_inds = np.argmin(np.abs(-path_px[:, 2:] - np.expand_dims(angles, axis=0)), axis=1)
-        footprints_coords = outline_coords[angle_inds] + np.expand_dims(path_px[:, :2], axis=1)
+        angle_inds = np.argmin(
+            np.abs(-path_px[:, 2:] - np.expand_dims(angles, axis=0)), axis=1
+        )
+        footprints_coords = outline_coords[angle_inds] + np.expand_dims(
+            path_px[:, :2], axis=1
+        )
 
         for footprint_coords in footprints_coords:
-            cv2.drawContours(visualization_map.data, [footprint_coords[:, ::-1].astype(int)], 0, footprint_color, footprint_thickness)
+            cv2.drawContours(
+                visualization_map.data,
+                [footprint_coords[:, ::-1].astype(int)],
+                0,
+                footprint_color,
+                footprint_thickness,
+            )
 
 
 def draw_frontiers(visualization_map, frontiers, color):
@@ -46,7 +71,9 @@ def draw_frontiers(visualization_map, frontiers, color):
     """
     for frontier in frontiers:
         frontier_px = xy_to_rc(frontier, visualization_map).astype(int)
-        frontier_px = frontier_px[which_coords_in_bounds(frontier_px, visualization_map.get_shape())]
+        frontier_px = frontier_px[
+            which_coords_in_bounds(frontier_px, visualization_map.get_shape())
+        ]
         cv2.drawContours(visualization_map.data, [frontier_px[:, ::-1]], 0, color, 2)
 
 
@@ -61,9 +88,18 @@ def draw_scan_ranges(visualization_map, state, scan_angles, scan_ranges, color):
               a valid value for the color to draw the path
     """
     occupied_coords = scan_to_points(scan_angles + state[2], scan_ranges) + state[:2]
-    occupied_coords = xy_to_rc(occupied_coords, visualization_map).astype(int)
-    occupied_coords = occupied_coords[which_coords_in_bounds(occupied_coords, visualization_map.get_shape())]
-    visualization_map.data[occupied_coords[:, 0], occupied_coords[:, 1]] = color
+    occupied_coords = np.round(xy_to_rc(occupied_coords, visualization_map)).astype(int)
+    occupied_coords = occupied_coords[
+        which_coords_in_bounds(occupied_coords, visualization_map.get_shape())
+    ]
+    position = np.round(xy_to_rc(state[:2], visualization_map)).astype(int)[::-1]
+    pts = np.empty((occupied_coords.shape[0] * 2, 2), dtype=int)
+    pts[::2] = position
+    pts[1::2] = occupied_coords[:, [1, 0]]
+    cv2.polylines(
+        visualization_map.data, [pts], False, color, 1, cv2.LINE_AA
+    )
+    # visualization_map.data[occupied_coords[:, 0], occupied_coords[:, 1]] = color
 
 
 def make_visualization_map(occupancy_map):
@@ -73,5 +109,7 @@ def make_visualization_map(occupancy_map):
     :return Costmap: same as occupancy map but now .data is a rgb image instead of grayscale
     """
     visualization_map = occupancy_map.copy()
-    visualization_map.data = np.dstack((occupancy_map.data, occupancy_map.data, occupancy_map.data))
+    visualization_map.data = np.dstack(
+        (occupancy_map.data, occupancy_map.data, occupancy_map.data)
+    )
     return visualization_map

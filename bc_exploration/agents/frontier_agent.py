@@ -13,12 +13,22 @@ from matplotlib import pyplot as plt
 from bc_exploration.agents.agent import Agent
 from bc_exploration.mapping.costmap import Costmap
 from bc_exploration.planners.astar_cpp import oriented_astar, get_astar_angles
-from bc_exploration.utilities.util import wrap_angles, which_coords_in_bounds, xy_to_rc, rc_to_xy
+from bc_exploration.utilities.util import (
+    wrap_angles,
+    which_coords_in_bounds,
+    xy_to_rc,
+    rc_to_xy,
+)
 
 
-def extract_frontiers(occupancy_map, approx=True, approx_iters=4,
-                      kernel=cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)),
-                      debug=False, debug_min_frontier_size=None):
+def extract_frontiers(
+    occupancy_map,
+    approx=True,
+    approx_iters=4,
+    kernel=cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)),
+    debug=False,
+    debug_min_frontier_size=None,
+):
     """
     Given a map of free/occupied/unexplored pixels, identify the frontiers.
     This method is a quicker method than the brute force approach,
@@ -35,8 +45,12 @@ def extract_frontiers(occupancy_map, approx=True, approx_iters=4,
     """
     # todo regional frontiers
     # extract coordinates of occupied, unexplored, and free coordinates
-    occupied_coords = np.argwhere(occupancy_map.data.astype(np.uint8) == Costmap.OCCUPIED)
-    unexplored_coords = np.argwhere(occupancy_map.data.astype(np.uint8) == Costmap.UNEXPLORED)
+    occupied_coords = np.argwhere(
+        occupancy_map.data.astype(np.uint8) == Costmap.OCCUPIED
+    )
+    unexplored_coords = np.argwhere(
+        occupancy_map.data.astype(np.uint8) == Costmap.UNEXPLORED
+    )
     free_coords = np.argwhere(occupancy_map.data.astype(np.uint8) == Costmap.FREE)
 
     if free_coords.shape[0] == 0 or unexplored_coords.shape[0] == 0:
@@ -57,39 +71,55 @@ def extract_frontiers(occupancy_map, approx=True, approx_iters=4,
 
     # can isolate the frontiers using the difference between the masks,
     # and looking for contours
-    frontier_mask = ((1 - dilated_unexplored_mask) - free_mask)
+    frontier_mask = (1 - dilated_unexplored_mask) - free_mask
     if approx:
-        frontier_mask = cv2.dilate(frontier_mask, kernel=kernel, iterations=approx_iters)
+        frontier_mask = cv2.dilate(
+            frontier_mask, kernel=kernel, iterations=approx_iters
+        )
         frontier_mask = cv2.erode(frontier_mask, kernel=kernel, iterations=approx_iters)
 
     # this indexing will work with opencv 2.x 3.x and 4.x
-    frontiers_xy_px = cv2.findContours(frontier_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)[-2:][0]
-    frontiers = [rc_to_xy(np.array(frontier).squeeze(1)[:, ::-1], occupancy_map) for frontier in frontiers_xy_px]
+    frontiers_xy_px = cv2.findContours(
+        frontier_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE
+    )[-2:][0]
+    frontiers = [
+        rc_to_xy(np.array(frontier).squeeze(1)[:, ::-1], occupancy_map)
+        for frontier in frontiers_xy_px
+    ]
 
     if debug:
-        frontier_map = np.repeat([occupancy_map.data], repeats=3, axis=0).transpose((1, 2, 0))
+        frontier_map = np.repeat([occupancy_map.data], repeats=3, axis=0).transpose(
+            (1, 2, 0)
+        )
         # frontiers = [frontiers[rank] for i, rank in enumerate(frontier_ranks)
         #              if i < self.num_frontiers_considered]
 
         cnt = 0
         for frontier in frontiers:
-            if debug_min_frontier_size and max([len(frontier), 1]) < debug_min_frontier_size:
+            if (
+                debug_min_frontier_size
+                and max([len(frontier), 1]) < debug_min_frontier_size
+            ):
                 continue
             cnt += 1
             # if frontier.astype(int).tolist() in self.frontier_blacklist:
             #     continue
             frontier_px = xy_to_rc(frontier, occupancy_map).astype(int)
-            frontier_px = frontier_px[which_coords_in_bounds(frontier_px, occupancy_map.get_shape())]
+            frontier_px = frontier_px[
+                which_coords_in_bounds(frontier_px, occupancy_map.get_shape())
+            ]
             frontier_map[frontier_px[:, 0], frontier_px[:, 1]] = [255, 0, 0]
 
-        plt.imshow(frontier_map, cmap='gray')
-        plt.title(f'{cnt} frontiers')
+        plt.imshow(frontier_map, cmap="gray")
+        plt.title(f"{cnt} frontiers")
         plt.show()
 
     return frontiers
 
 
-def cleanup_map_for_planning(occupancy_map, kernel, filter_obstacles=False, debug=False):
+def cleanup_map_for_planning(
+    occupancy_map, kernel, filter_obstacles=False, debug=False
+):
     """
     We are not allowed to plan in unexplored space, (treated as collision), so what we do is dilate/erode the free
     space on the map to eat up the small little unexplored pixels, allows for quicker planning.
@@ -116,11 +146,15 @@ def cleanup_map_for_planning(occupancy_map, kernel, filter_obstacles=False, debu
         occupied_coords = np.argwhere(occupied_mask == 1)
 
     cleaned_occupancy_map = occupancy_map.copy()
-    cleaned_occupancy_map.data[new_free_coords[:, 0], new_free_coords[:, 1]] = Costmap.FREE
-    cleaned_occupancy_map.data[occupied_coords[:, 0], occupied_coords[:, 1]] = Costmap.OCCUPIED
+    cleaned_occupancy_map.data[
+        new_free_coords[:, 0], new_free_coords[:, 1]
+    ] = Costmap.FREE
+    cleaned_occupancy_map.data[
+        occupied_coords[:, 0], occupied_coords[:, 1]
+    ] = Costmap.OCCUPIED
 
     if debug:
-        plt.imshow(cleaned_occupancy_map.data, cmap='gray', interpolation='nearest')
+        plt.imshow(cleaned_occupancy_map.data, cmap="gray", interpolation="nearest")
         plt.show()
 
     return cleaned_occupancy_map
@@ -133,14 +167,17 @@ class FrontierAgent(Agent):
     A Frontier-Based Approach for Autonomous Exploration
     https://pdfs.semanticscholar.org/9afb/8b6ee449e1ddf1268ace8efb4b69578b94f6.pdf
     """
-    def __init__(self,
-                 footprint,
-                 mode='closest',
-                 min_frontier_size=10,
-                 max_replans=3,
-                 planning_resolution=None,
-                 planning_epsilon=1.0,
-                 planning_delta_scale=1.5):
+
+    def __init__(
+        self,
+        footprint,
+        mode="closest",
+        min_frontier_size=10,
+        max_replans=3,
+        planning_resolution=None,
+        planning_epsilon=1.0,
+        planning_delta_scale=1.5,
+    ):
         """
         Implementation with similar idea to the paper:
 
@@ -174,7 +211,12 @@ class FrontierAgent(Agent):
         """
 
         Agent.__init__(self)
-        assert mode in ['closest-closest', 'largest-closest', 'closest-middle', 'largest-middle']
+        assert mode in [
+            "closest-closest",
+            "largest-closest",
+            "closest-middle",
+            "largest-middle",
+        ]
 
         self._footprint = footprint
 
@@ -220,8 +262,10 @@ class FrontierAgent(Agent):
         """
         if compute:
             assert occupancy_map is not None
-            frontiers = extract_frontiers(occupancy_map=occupancy_map,
-                                          kernel=cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)))
+            frontiers = extract_frontiers(
+                occupancy_map=occupancy_map,
+                kernel=cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)),
+            )
             frontiers = self._filter_frontiers(frontiers, occupancy_map)
             return self._filter_frontiers(frontiers, occupancy_map)
 
@@ -241,11 +285,20 @@ class FrontierAgent(Agent):
         :param occupancy_map Costmap: corresponding to the current occupancy map
         :return List(array(N, 2)[float]: new_frontiers, the filtered frontiers
         """
-        frontier_sizes = np.array([frontier.shape[0] if len(frontier.shape) > 1 else 1 for frontier in frontiers])
+        frontier_sizes = np.array(
+            [
+                frontier.shape[0] if len(frontier.shape) > 1 else 1
+                for frontier in frontiers
+            ]
+        )
         valid_frontier_inds = np.argwhere(frontier_sizes >= self._min_frontier_size)
-        return [frontier for i, frontier in enumerate(frontiers)
-                if i in valid_frontier_inds and xy_to_rc(frontier, occupancy_map).astype(int).tolist()
-                not in self._frontier_blacklist]
+        return [
+            frontier
+            for i, frontier in enumerate(frontiers)
+            if i in valid_frontier_inds
+            and xy_to_rc(frontier, occupancy_map).astype(int).tolist()
+            not in self._frontier_blacklist
+        ]
 
     def _compute_frontier_ranks(self, state, frontiers):
         """
@@ -257,11 +310,13 @@ class FrontierAgent(Agent):
         """
         # todo do not recompute sizes a bunch of times
         # rank the frontiers based on the mode selected
-        if self._mode.split('-')[0] == 'closest':
-            frontier_distances = [np.min(np.sqrt(np.sum((state[:2] - frontier) ** 2, axis=1)))
-                                  for frontier in frontiers]
+        if self._mode.split("-")[0] == "closest":
+            frontier_distances = [
+                np.min(np.sqrt(np.sum((state[:2] - frontier) ** 2, axis=1)))
+                for frontier in frontiers
+            ]
             frontier_ranks = np.argsort(frontier_distances)
-        elif self._mode.split('-')[0] == 'largest':
+        elif self._mode.split("-")[0] == "largest":
             frontier_sizes = [frontier.shape[0] for frontier in frontiers]
             frontier_ranks = np.argsort(frontier_sizes)[::-1]
         else:
@@ -283,14 +338,26 @@ class FrontierAgent(Agent):
         self._plan_iteration += 1
 
         # precompute items for collision checking
-        if self._footprint_masks is None or self._footprint_mask_radius is None or self._footprint_outline_coords is None:
-            self._footprint_masks = self._footprint.get_footprint_masks(occupancy_map.resolution, angles=self._planning_angles)
-            self._footprint_outline_coords = self._footprint.get_outline_coords(occupancy_map.resolution, angles=self._planning_angles)
-            self._footprint_mask_radius = self._footprint.get_mask_radius(occupancy_map.resolution)
+        if (
+            self._footprint_masks is None
+            or self._footprint_mask_radius is None
+            or self._footprint_outline_coords is None
+        ):
+            self._footprint_masks = self._footprint.get_footprint_masks(
+                occupancy_map.resolution, angles=self._planning_angles
+            )
+            self._footprint_outline_coords = self._footprint.get_outline_coords(
+                occupancy_map.resolution, angles=self._planning_angles
+            )
+            self._footprint_mask_radius = self._footprint.get_mask_radius(
+                occupancy_map.resolution
+            )
 
         if self._planning_resolution is not None:
             assert occupancy_map.resolution <= self._planning_resolution
-            planning_scale = int(np.round(self._planning_resolution / occupancy_map.resolution))
+            planning_scale = int(
+                np.round(self._planning_resolution / occupancy_map.resolution)
+            )
         else:
             planning_scale = 1
 
@@ -316,17 +383,21 @@ class FrontierAgent(Agent):
             return np.empty((0, 3))
 
         # clean the occupancy map, eat up small unexplored pixels we dont want to consider a collision
-        exploration_map = cleanup_map_for_planning(occupancy_map=exploration_map, kernel=kernel)
+        exploration_map = cleanup_map_for_planning(
+            occupancy_map=exploration_map, kernel=kernel
+        )
 
         # define our planning function, we use a partial here because most of the inputs are the same
-        oriented_astar_partial = partial(oriented_astar,
-                                         start=state,
-                                         occupancy_map=exploration_map,
-                                         footprint_masks=self._footprint_masks,
-                                         outline_coords=self._footprint_outline_coords,
-                                         obstacle_values=[Costmap.OCCUPIED, Costmap.UNEXPLORED],
-                                         planning_scale=planning_scale,
-                                         epsilon=self._planning_epsilon)
+        oriented_astar_partial = partial(
+            oriented_astar,
+            start=state,
+            occupancy_map=exploration_map,
+            footprint_masks=self._footprint_masks,
+            outline_coords=self._footprint_outline_coords,
+            obstacle_values=[Costmap.OCCUPIED, Costmap.UNEXPLORED],
+            planning_scale=planning_scale,
+            epsilon=self._planning_epsilon,
+        )
 
         num_replans = 0
         frontier_idx = 0
@@ -342,7 +413,9 @@ class FrontierAgent(Agent):
                 planning_delta *= self._planning_delta_scale
 
                 if num_replans < self._max_replans - 1:
-                    print("Not able to plan to frontiers. Increasing planning delta and trying again!")
+                    print(
+                        "Not able to plan to frontiers. Increasing planning delta and trying again!"
+                    )
                 else:
                     if failsafe_path is None and not tried_blacklist_frontiers:
                         print("Not able to plan to any frontiers, resetting blacklist")
@@ -350,7 +423,9 @@ class FrontierAgent(Agent):
                         self._frontier_blacklist = [[]]
                         continue
                     else:
-                        print("Not able to plan to any frontiers, choosing failsafe path")
+                        print(
+                            "Not able to plan to any frontiers, choosing failsafe path"
+                        )
                         break
 
             best_frontier = frontiers[frontier_ranks[frontier_idx]]
@@ -359,19 +434,25 @@ class FrontierAgent(Agent):
             if best_frontier.shape[0] == 0:
                 continue
 
-            best_frontier_rc_list = xy_to_rc(best_frontier, exploration_map).astype(int).tolist()
+            best_frontier_rc_list = (
+                xy_to_rc(best_frontier, exploration_map).astype(int).tolist()
+            )
             if best_frontier_rc_list in self._frontier_blacklist:
                 frontier_ranks = np.delete(frontier_ranks, frontier_idx)
                 continue
 
             # based off the mode, we will compute a path to the closest point or the middle of the frontier
-            if self._mode.split('-')[1] == 'closest':
+            if self._mode.split("-")[1] == "closest":
                 # navigate to the closest point on the best frontier
-                desired_coord_ranks = np.argsort(np.sum((state[:2] - best_frontier) ** 2, axis=1))
-            elif self._mode.split('-')[1] == 'middle':
+                desired_coord_ranks = np.argsort(
+                    np.sum((state[:2] - best_frontier) ** 2, axis=1)
+                )
+            elif self._mode.split("-")[1] == "middle":
                 # navigate to the middle of the best frontier
                 frontier_mean = np.mean(best_frontier, axis=0)
-                desired_coord_ranks = np.argsort(np.sqrt(np.sum((frontier_mean - best_frontier) ** 2, axis=1)))
+                desired_coord_ranks = np.argsort(
+                    np.sqrt(np.sum((frontier_mean - best_frontier) ** 2, axis=1))
+                )
             else:
                 desired_coord_ranks = None
                 assert False and "Mode not supported"
@@ -379,11 +460,17 @@ class FrontierAgent(Agent):
             goal = None
             # todo try more angles
             start_frontier_vector = best_frontier[desired_coord_ranks[0]] - state[:2]
-            angle_to_frontier = wrap_angles(np.arctan2(start_frontier_vector[0], start_frontier_vector[1]))
+            angle_to_frontier = wrap_angles(
+                np.arctan2(start_frontier_vector[0], start_frontier_vector[1])
+            )
             # find a point near the desired coord where our footprint fits
             for _, ind in enumerate(desired_coord_ranks):
-                candidate_state = np.concatenate((np.array(best_frontier[ind]).squeeze(), [angle_to_frontier]))
-                if not self._footprint.check_for_collision(state=candidate_state, occupancy_map=exploration_map):
+                candidate_state = np.concatenate(
+                    (np.array(best_frontier[ind]).squeeze(), [angle_to_frontier])
+                )
+                if not self._footprint.check_for_collision(
+                    state=candidate_state, occupancy_map=exploration_map
+                ):
                     goal = candidate_state
                     break
 
@@ -395,49 +482,78 @@ class FrontierAgent(Agent):
                 continue
 
             if debug:
-                frontier_map = np.repeat([exploration_map.data], repeats=3, axis=0).transpose((1, 2, 0)).copy()
+                frontier_map = (
+                    np.repeat([exploration_map.data], repeats=3, axis=0)
+                    .transpose((1, 2, 0))
+                    .copy()
+                )
                 best_frontier = frontiers[frontier_ranks[frontier_idx]]
                 best_frontier_vis = xy_to_rc(best_frontier, exploration_map).astype(int)
                 best_frontier_vis = best_frontier_vis[
-                    which_coords_in_bounds(best_frontier_vis, exploration_map.get_shape())]
-                frontier_map[best_frontier_vis[:, 0], best_frontier_vis[:, 1]] = [255, 0, 0]
+                    which_coords_in_bounds(
+                        best_frontier_vis, exploration_map.get_shape()
+                    )
+                ]
+                frontier_map[best_frontier_vis[:, 0], best_frontier_vis[:, 1]] = [
+                    255,
+                    0,
+                    0,
+                ]
 
                 for _, ind in enumerate(desired_coord_ranks):
-                    candidate_state = np.concatenate((np.array(best_frontier[ind]).squeeze(), [angle_to_frontier]))
-                    if not self._footprint.check_for_collision(state=candidate_state, occupancy_map=exploration_map):
+                    candidate_state = np.concatenate(
+                        (np.array(best_frontier[ind]).squeeze(), [angle_to_frontier])
+                    )
+                    if not self._footprint.check_for_collision(
+                        state=candidate_state, occupancy_map=exploration_map
+                    ):
                         goal = candidate_state
                         break
 
                 goal_vis = xy_to_rc(goal, exploration_map)
                 frontier_map[int(goal_vis[0]), int(goal_vis[1])] = [0, 255, 0]
-                cv2.circle(frontier_map, tuple(xy_to_rc(state[:2], exploration_map)[::-1].astype(int)),
-                           self._footprint.get_radius_in_pixels(exploration_map.resolution), (255, 0, 255), thickness=-1)
-                plt.imshow(frontier_map, interpolation='nearest')
+                cv2.circle(
+                    frontier_map,
+                    tuple(xy_to_rc(state[:2], exploration_map)[::-1].astype(int)),
+                    self._footprint.get_radius_in_pixels(exploration_map.resolution),
+                    (255, 0, 255),
+                    thickness=-1,
+                )
+                plt.imshow(frontier_map, interpolation="nearest")
                 plt.show()
 
-            plan_successful, path = oriented_astar_partial(goal=goal, delta=planning_delta)
+            plan_successful, path = oriented_astar_partial(
+                goal=goal, delta=planning_delta
+            )
 
             if debug:
-                oriented_astar_partial = partial(oriented_astar,
-                                                 start=state,
-                                                 occupancy_map=exploration_map,
-                                                 footprint_masks=self._footprint_masks,
-                                                 outline_coords=self._footprint_outline_coords,
-                                                 obstacle_values=[Costmap.OCCUPIED, Costmap.UNEXPLORED],
-                                                 planning_scale=planning_scale,
-                                                 epsilon=self._planning_epsilon)
+                oriented_astar_partial = partial(
+                    oriented_astar,
+                    start=state,
+                    occupancy_map=exploration_map,
+                    footprint_masks=self._footprint_masks,
+                    outline_coords=self._footprint_outline_coords,
+                    obstacle_values=[Costmap.OCCUPIED, Costmap.UNEXPLORED],
+                    planning_scale=planning_scale,
+                    epsilon=self._planning_epsilon,
+                )
 
-                plan_successful, path = oriented_astar_partial(goal=goal, delta=planning_delta)
+                plan_successful, path = oriented_astar_partial(
+                    goal=goal, delta=planning_delta
+                )
 
                 path_map = np.array(exploration_map.data)
                 path_vis = xy_to_rc(path, exploration_map)[:, :2].astype(int)
                 best_frontier = frontiers[frontier_ranks[frontier_idx]]
                 best_frontier_vis = xy_to_rc(best_frontier, exploration_map).astype(int)
                 best_frontier_vis = best_frontier_vis[
-                    which_coords_in_bounds(best_frontier_vis, exploration_map.get_shape())]
+                    which_coords_in_bounds(
+                        best_frontier_vis, exploration_map.get_shape()
+                    )
+                ]
                 path_map[best_frontier_vis[:, 0], best_frontier_vis[:, 1]] = 75
                 path_map[path_vis[:, 0], path_vis[:, 1]] = 175
-                plt.imshow(path_map, cmap='gray', interpolation='nearest')
+                plt.imshow(path_map, cmap="gray", interpolation="nearest")
                 plt.show()
 
             if plan_successful and path.shape[0] <= 1:

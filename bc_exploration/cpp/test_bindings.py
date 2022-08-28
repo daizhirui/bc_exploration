@@ -18,5 +18,5 @@ def test_bindings(debug=False):
         print(bc_exploration.cpp.c_check_for_collision.__doc__)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_bindings(debug=True)

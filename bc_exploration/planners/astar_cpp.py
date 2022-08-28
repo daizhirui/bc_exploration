@@ -6,7 +6,12 @@ from __future__ import print_function, absolute_import, division
 import numpy as np
 
 from bc_exploration.utilities.util import xy_to_rc, rc_to_xy
-from bc_exploration.cpp import c_astar, c_oriented_astar, c_oriented_astar_multi_goals, c_get_astar_angles
+from bc_exploration.cpp import (
+    c_astar,
+    c_oriented_astar,
+    c_oriented_astar_multi_goals,
+    c_get_astar_angles,
+)
 
 
 def get_astar_angles():
@@ -18,7 +23,16 @@ def get_astar_angles():
     return c_angles
 
 
-def astar(goal, start, occupancy_map, obstacle_values, planning_scale=1, delta=0.0, epsilon=1.0, allow_diagonal=False):
+def astar(
+    goal,
+    start,
+    occupancy_map,
+    obstacle_values,
+    planning_scale=1,
+    delta=0.0,
+    epsilon=1.0,
+    allow_diagonal=False,
+):
     """
     Wrapper for vanilla a-star c++ planning. given a start and end and a map, give a path.
     :param goal array(3)[float]: [x, y, theta] goal pose of the robot
@@ -43,21 +57,33 @@ def astar(goal, start, occupancy_map, obstacle_values, planning_scale=1, delta=0
 
     c_occupancy_map = occupancy_map.data.astype(np.uint8)
 
-    success, path_px = c_astar(c_start,
-                               c_goal,
-                               c_occupancy_map,
-                               obstacle_values,
-                               delta,
-                               epsilon,
-                               planning_scale,
-                               allow_diagonal)
+    success, path_px = c_astar(
+        c_start,
+        c_goal,
+        c_occupancy_map,
+        obstacle_values,
+        delta,
+        epsilon,
+        planning_scale,
+        allow_diagonal,
+    )
 
     path = rc_to_xy(path_px, occupancy_map)
     return success, np.vstack(([start], path))
 
 
-def oriented_astar(goal, start, occupancy_map, footprint_masks,
-                   outline_coords, obstacle_values, planning_scale=1, delta=0.0, epsilon=1.0, allow_diagonal=True):
+def oriented_astar(
+    goal,
+    start,
+    occupancy_map,
+    footprint_masks,
+    outline_coords,
+    obstacle_values,
+    planning_scale=1,
+    delta=0.0,
+    epsilon=1.0,
+    allow_diagonal=True,
+):
     """
         Oriented Astar C++ wrapper for python. Formats input data in required format for c++ function, the calls it,
     returning the path if found.
@@ -99,25 +125,38 @@ def oriented_astar(goal, start, occupancy_map, footprint_masks,
 
     c_obstacle_values = np.array(obstacle_values, dtype=np.uint8)
 
-    success, path_px = c_oriented_astar(c_start,
-                                        c_goal,
-                                        c_occupancy_map,
-                                        c_footprint_masks,
-                                        c_angles,
-                                        c_outline_coords,
-                                        c_obstacle_values,
-                                        delta,
-                                        epsilon,
-                                        planning_scale,
-                                        allow_diagonal)
+    success, path_px = c_oriented_astar(
+        c_start,
+        c_goal,
+        c_occupancy_map,
+        c_footprint_masks,
+        c_angles,
+        c_outline_coords,
+        c_obstacle_values,
+        delta,
+        epsilon,
+        planning_scale,
+        allow_diagonal,
+    )
     path = np.empty((1 + path_px.shape[0], path_px.shape[1]))
     path[:1, :] = start
     path[1:, :] = rc_to_xy(path_px, occupancy_map)
     return success, path  # np.vstack([[start], path])
 
 
-def oriented_astar_multi_goals(goals, start, occupancy_map, footprint_masks,
-    outline_coords, obstacle_values, planning_scale=1, delta=0.0, epsilon=1.0, allow_diagonal=True, parallel=False):
+def oriented_astar_multi_goals(
+    goals,
+    start,
+    occupancy_map,
+    footprint_masks,
+    outline_coords,
+    obstacle_values,
+    planning_scale=1,
+    delta=0.0,
+    epsilon=1.0,
+    allow_diagonal=True,
+    parallel=False,
+):
     c_angles = np.array(c_get_astar_angles(), dtype=np.float32)
 
     start_px = xy_to_rc(start, occupancy_map)
@@ -136,7 +175,8 @@ def oriented_astar_multi_goals(goals, start, occupancy_map, footprint_masks,
 
     c_obstacle_values = np.array(obstacle_values, dtype=np.uint8)
 
-    outs = c_oriented_astar_multi_goals(c_start,
+    outs = c_oriented_astar_multi_goals(
+        c_start,
         c_goals,
         c_occupancy_map,
         c_footprint_masks,
@@ -147,7 +187,8 @@ def oriented_astar_multi_goals(goals, start, occupancy_map, footprint_masks,
         epsilon,
         planning_scale,
         allow_diagonal,
-        parallel)
+        parallel,
+    )
 
     success_flags = []
     paths = []

@@ -13,6 +13,7 @@ class Agent:
     Must have a plan method, which takes the state (position of the robot), and the current map.
     plan should return path to next state and/or actions needed to get there
     """
+
     def __init__(self):
         """
         Abstract base class for the various exploration agents.

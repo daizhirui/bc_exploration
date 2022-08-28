@@ -9,7 +9,9 @@ import os
 import numpy as np
 import pickle
 
-from bc_exploration.algorithms.frontier_based_exploration import run_frontier_exploration
+from bc_exploration.algorithms.frontier_based_exploration import (
+    run_frontier_exploration,
+)
 from bc_exploration.utilities.paths import get_maps_dir, get_exploration_dir
 
 
@@ -31,7 +33,7 @@ def make_batches(dataset, batch_size):
     :param batch_size int: the size of which to batch
     """
     for i in range(0, len(dataset), batch_size):
-        yield dataset[i:i + batch_size]
+        yield dataset[i : i + batch_size]
 
 
 def run_one_frontier(config, return_queue):
@@ -41,9 +43,17 @@ def run_one_frontier(config, return_queue):
     :param return_queue multiprocessing.Queue:, containing the results for all the processes created
     """
     # occupancy map cannot be returned, process.join() will hang
-    _, percent_explored, iterations_taken, was_sucessful = run_frontier_exploration(**config)
-    return_queue.put(dict(zip(['percent_explored', 'iterations_taken', 'was_successful'],
-                              (percent_explored, iterations_taken, was_sucessful))))
+    _, percent_explored, iterations_taken, was_sucessful = run_frontier_exploration(
+        **config
+    )
+    return_queue.put(
+        dict(
+            zip(
+                ["percent_explored", "iterations_taken", "was_successful"],
+                (percent_explored, iterations_taken, was_sucessful),
+            )
+        )
+    )
 
 
 def run_frontier_benchmark(config, num_instances, num_processes):
@@ -61,7 +71,13 @@ def run_frontier_benchmark(config, num_instances, num_processes):
         processes = []
         for process_idx in compute_group:
             np.random.seed(process_idx)
-            process = multiprocessing.Process(target=run_one_frontier, args=(config, result_queue,))
+            process = multiprocessing.Process(
+                target=run_one_frontier,
+                args=(
+                    config,
+                    result_queue,
+                ),
+            )
             process.start()
             processes.append(process)
 
@@ -71,7 +87,7 @@ def run_frontier_benchmark(config, num_instances, num_processes):
     results = []
     for i in range(num_instances):
         result = result_queue.get().copy()
-        result.update({'seed': i})
+        result.update({"seed": i})
         results.append(result)
 
     return results
@@ -85,22 +101,31 @@ def run_consistency(frontier_config, num_instances):
     :param num_instances int: total number of runs to do
     :return List[dict]: results from the benchmark
     """
-    consistency_results = run_frontier_benchmark(frontier_config, num_instances=num_instances, num_processes=4)
-    iterations = [consistency_result['iterations_taken'] for consistency_result in consistency_results]
+    consistency_results = run_frontier_benchmark(
+        frontier_config, num_instances=num_instances, num_processes=4
+    )
+    iterations = [
+        consistency_result["iterations_taken"]
+        for consistency_result in consistency_results
+    ]
     assert np.std(iterations) < 3
     return consistency_results
 
 
 def run_completion(frontier_config, num_instances):
     """
-     Runs the completion test, i.e the exploration algorithm is run from multiple random locations in the same
-     environment and expected to solve it every run
-     :param frontier_config dict: corresponding to all the function params to run_frontier_exploration(...)
-     :param num_instances int: total number of runs to do
-     :return List[dict]: results from the benchmark
-     """
-    completion_results = run_frontier_benchmark(frontier_config, num_instances=num_instances, num_processes=4)
-    successes = [completion_result['was_successful'] for completion_result in completion_results]
+    Runs the completion test, i.e the exploration algorithm is run from multiple random locations in the same
+    environment and expected to solve it every run
+    :param frontier_config dict: corresponding to all the function params to run_frontier_exploration(...)
+    :param num_instances int: total number of runs to do
+    :return List[dict]: results from the benchmark
+    """
+    completion_results = run_frontier_benchmark(
+        frontier_config, num_instances=num_instances, num_processes=4
+    )
+    successes = [
+        completion_result["was_successful"] for completion_result in completion_results
+    ]
     assert np.all(successes)
     return completion_results
 
@@ -125,33 +150,41 @@ def run_frontier_benchmarks():
         map_filename = os.path.join(get_maps_dir(), map_name)
         params_filename = os.path.join(get_exploration_dir(), params)
 
-        completion_config = dict(map_filename=map_filename,
-                                 params_filename=params_filename,
-                                 start_state=None,
-                                 sensor_range=sensor_range,
-                                 completion_percentage=completion_percentage,
-                                 render=False,
-                                 render_wait_for_key=False,
-                                 max_exploration_iterations=max_exploration_iterations)
+        completion_config = dict(
+            map_filename=map_filename,
+            params_filename=params_filename,
+            start_state=None,
+            sensor_range=sensor_range,
+            completion_percentage=completion_percentage,
+            render=False,
+            render_wait_for_key=False,
+            max_exploration_iterations=max_exploration_iterations,
+        )
 
         consistency_config = completion_config.copy()
-        consistency_config['start_state'] = consistency_start_states[i]
+        consistency_config["start_state"] = consistency_start_states[i]
 
-        consistency_results = run_consistency(consistency_config, num_instances=num_instances)
-        completion_results = run_completion(completion_config, num_instances=num_instances)
+        consistency_results = run_consistency(
+            consistency_config, num_instances=num_instances
+        )
+        completion_results = run_completion(
+            completion_config, num_instances=num_instances
+        )
 
         print(map_name)
-        print('consistency:')
+        print("consistency:")
         _ = [print(consistency_result) for consistency_result in consistency_results]
         print()
-        print('completion:')
+        print("completion:")
         _ = [print(completion_result) for completion_result in completion_results]
         print()
 
-        results[map_name] = {'consistency': consistency_results,
-                             'completion': completion_results}
+        results[map_name] = {
+            "consistency": consistency_results,
+            "completion": completion_results,
+        }
 
-    with open('benchmark_results.pkl', 'w') as f:
+    with open("benchmark_results.pkl", "w") as f:
         pickle.dump(results, f)
 
 
@@ -162,5 +195,5 @@ def main():
     run_frontier_benchmarks()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

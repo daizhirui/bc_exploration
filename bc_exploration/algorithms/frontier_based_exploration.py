@@ -12,14 +12,26 @@ import yaml
 
 from bc_exploration.agents.frontier_agent import FrontierAgent
 from bc_exploration.envs.grid_world import GridWorld
-from bc_exploration.footprints.footprint_points import get_tricky_circular_footprint, get_tricky_oval_footprint, get_jackal_footprint
+from bc_exploration.footprints.footprint_points import (
+    get_tricky_circular_footprint,
+    get_tricky_oval_footprint,
+    get_jackal_footprint,
+)
 from bc_exploration.footprints.footprints import CustomFootprint
 from bc_exploration.mapping.costmap import Costmap
 from bc_exploration.mapping.log_odds_mapper import LogOddsMapper
 from bc_exploration.sensors.sensors import Lidar
 from bc_exploration.utilities.paths import get_maps_dir, get_exploration_dir
-from bc_exploration.utilities.util import xy_to_rc, which_coords_in_bounds, scan_to_points
-from bc_exploration.utilities.visualization import draw_footprint_path, draw_frontiers, draw_scan_ranges
+from bc_exploration.utilities.util import (
+    xy_to_rc,
+    which_coords_in_bounds,
+    scan_to_points,
+)
+from bc_exploration.utilities.visualization import (
+    draw_footprint_path,
+    draw_frontiers,
+    draw_scan_ranges,
+)
 
 
 def create_frontier_agent_from_params(params_filename):
@@ -33,40 +45,58 @@ def create_frontier_agent_from_params(params_filename):
     with open(os.path.join(params_filename)) as f:
         params = yaml.load(f, Loader=yaml.FullLoader)
 
-    assert params['algorithm'] == 'frontier'
-    if params['footprint']['type'] == 'tricky_circle':
+    assert params["algorithm"] == "frontier"
+    if params["footprint"]["type"] == "tricky_circle":
         footprint_points = get_tricky_circular_footprint()
-    elif params['footprint']['type'] == 'tricky_oval':
+    elif params["footprint"]["type"] == "tricky_oval":
         footprint_points = get_tricky_oval_footprint()
-    elif params['footprint']['type'] == 'jackal':
+    elif params["footprint"]["type"] == "jackal":
         footprint_points = get_jackal_footprint()
-    elif params['footprint']['type'] == 'circle':
+    elif params["footprint"]["type"] == "circle":
         rotation_angles = np.arange(0, 2 * np.pi, 4 * np.pi / 180)
-        footprint_points = \
-            params['footprint']['radius'] * np.array([np.cos(rotation_angles), np.sin(rotation_angles)]).T
-    elif params['footprint']['type'] == 'pixel':
-        footprint_points = np.array([[0., 0.]])
+        footprint_points = (
+            params["footprint"]["radius"]
+            * np.array([np.cos(rotation_angles), np.sin(rotation_angles)]).T
+        )
+    elif params["footprint"]["type"] == "pixel":
+        footprint_points = np.array([[0.0, 0.0]])
     else:
         footprint_points = None
         assert False and "footprint type specified not supported."
 
-    footprint = CustomFootprint(footprint_points=footprint_points,
-                                angular_resolution=params['footprint']['angular_resolution'],
-                                inflation_scale=params['footprint']['inflation_scale'])
+    footprint = CustomFootprint(
+        footprint_points=footprint_points,
+        angular_resolution=params["footprint"]["angular_resolution"],
+        inflation_scale=params["footprint"]["inflation_scale"],
+    )
 
-    frontier_agent = FrontierAgent(footprint=footprint,
-                                   mode=params['mode'],
-                                   min_frontier_size=params['min_frontier_size'],
-                                   max_replans=params['max_replans'],
-                                   planning_resolution=params['planning_resolution'],
-                                   planning_epsilon=params['planning_epsilon'],
-                                   planning_delta_scale=params['planning_delta_scale'])
+    frontier_agent = FrontierAgent(
+        footprint=footprint,
+        mode=params["mode"],
+        min_frontier_size=params["min_frontier_size"],
+        max_replans=params["max_replans"],
+        planning_resolution=params["planning_resolution"],
+        planning_epsilon=params["planning_epsilon"],
+        planning_delta_scale=params["planning_delta_scale"],
+    )
 
     return frontier_agent
 
 
-def visualize(occupancy_map, state, scan_angles, scan_ranges, footprint, path, render_size, start_state, frontiers,
-              wait_key=0, flipud=False, path_idx=None):
+def visualize(
+    occupancy_map,
+    state,
+    scan_angles,
+    scan_ranges,
+    footprint,
+    path,
+    render_size,
+    start_state,
+    frontiers,
+    wait_key=0,
+    flipud=False,
+    path_idx=None,
+):
     """
     Visualization function for exploration.
     :param occupancy_map Costmap: object, map to visualize
@@ -85,41 +115,68 @@ def visualize(occupancy_map, state, scan_angles, scan_ranges, footprint, path, r
     map_vis = occupancy_map.copy()
     map_vis.data = cv2.cvtColor(map_vis.data, cv2.COLOR_GRAY2BGR)
 
+    if scan_ranges.shape[0]:
+        draw_scan_ranges(
+            visualization_map=map_vis,
+            state=state,
+            scan_angles=scan_angles,
+            scan_ranges=scan_ranges,
+            color=[0, 255, 0],
+        )
+
     if np.array(path).shape[0]:
         # todo draw arrow with heading
-        draw_footprint_path(footprint=footprint, path=path[:-1] if path_idx is None else path[path_idx + 1:-1],
-                            visualization_map=map_vis, footprint_color=[200, 255, 200], path_color=None,
-                            footprint_thickness=-1)
+        draw_footprint_path(
+            footprint=footprint,
+            path=path[:-1] if path_idx is None else path[path_idx + 1 : -1],
+            visualization_map=map_vis,
+            footprint_color=[200, 255, 200],
+            path_color=None,
+            footprint_thickness=-1,
+        )
 
     if start_state is not None:
         footprint.no_inflation().draw([0, 0, start_state[2]], map_vis, [10, 122, 127])
     footprint.no_inflation().draw(state, map_vis, [127, 122, 10])
 
-    if scan_ranges.shape[0]:
-        draw_scan_ranges(visualization_map=map_vis, state=state,
-                         scan_angles=scan_angles, scan_ranges=scan_ranges, color=[0, 255, 0])
-
     if len(frontiers):
         successful_frontiers = [frontier for frontier, flag in frontiers if flag]
         failed_frontiers = [frontier for frontier, flag in frontiers if not flag]
         if len(successful_frontiers):
-            draw_frontiers(visualization_map=map_vis, frontiers=successful_frontiers, color=[255, 150, 80])
+            draw_frontiers(
+                visualization_map=map_vis,
+                frontiers=successful_frontiers,
+                color=[255, 150, 80],
+            )
         if len(failed_frontiers):
-            draw_frontiers(visualization_map=map_vis, frontiers=failed_frontiers, color=[0, 0, 255])
+            draw_frontiers(
+                visualization_map=map_vis, frontiers=failed_frontiers, color=[0, 0, 255]
+            )
 
     # visualize map
-    cv2.namedWindow('map', cv2.WINDOW_GUI_NORMAL)
+    cv2.namedWindow("map", cv2.WINDOW_GUI_NORMAL)
     if flipud:
-        cv2.imshow('map', np.flipud(map_vis.data))
+        cv2.imshow("map", np.flipud(map_vis.data))
     else:
-        cv2.imshow('map', map_vis.data)
-    cv2.resizeWindow('map', *render_size)
+        cv2.imshow("map", map_vis.data)
+    cv2.resizeWindow("map", *render_size)
     cv2.waitKey(wait_key)
 
 
-def run_frontier_exploration(map_filename, params_filename, start_state, sensor_range, map_resolution,
-                             completion_percentage, render=True, render_interval=1, render_size_scale=1.7,
-                             completion_check_interval=1, render_wait_for_key=True, max_exploration_iterations=None):
+def run_frontier_exploration(
+    map_filename,
+    params_filename,
+    start_state,
+    sensor_range,
+    map_resolution,
+    completion_percentage,
+    render=True,
+    render_interval=1,
+    render_size_scale=1.7,
+    completion_check_interval=1,
+    render_wait_for_key=True,
+    max_exploration_iterations=None,
+):
     """
     Interface for running frontier exploration on the grid world environment that is initialized via map_filename.. etc
     :param map_filename str: path of the map to load into the grid world environment, needs to be a uint8 png with
@@ -148,49 +205,72 @@ def run_frontier_exploration(map_filename, params_filename, start_state, sensor_
     footprint = frontier_agent.get_footprint()
 
     # pick a sensor
-    sensor = Lidar(sensor_range=sensor_range,
-                   angular_range=250 * np.pi / 180,
-                   angular_resolution=1.0 * np.pi / 180,
-                   map_resolution=map_resolution)
+    sensor = Lidar(
+        sensor_range=sensor_range,
+        angular_range=250 * np.pi / 180,
+        angular_resolution=1.0 * np.pi / 180,
+        map_resolution=map_resolution,
+    )
 
     # setup grid world environment
-    env = GridWorld(map_filename=map_filename,
-                    map_resolution=map_resolution,
-                    sensor=sensor,
-                    footprint=footprint,
-                    start_state=start_state)
+    env = GridWorld(
+        map_filename=map_filename,
+        map_resolution=map_resolution,
+        sensor=sensor,
+        footprint=footprint,
+        start_state=start_state,
+    )
 
     render_size = (np.array(env.get_map_shape()[::-1]) * render_size_scale).astype(int)
 
     # setup log-odds mapper, we assume the measurements are very accurate,
     # thus one scan should be enough to fill the map
-    padding = 1.
-    map_shape = np.array(env.get_map_shape()) + int(2. * padding // map_resolution)
-    initial_map = Costmap(data=Costmap.UNEXPLORED * np.ones(map_shape, dtype=np.uint8),
-                          resolution=env.get_map_resolution(),
-                          origin=[-padding - env.start_state[0], -padding - env.start_state[1]])
+    padding = 1.0
+    map_shape = np.array(env.get_map_shape()) + int(2.0 * padding // map_resolution)
+    initial_map = Costmap(
+        data=Costmap.UNEXPLORED * np.ones(map_shape, dtype=np.uint8),
+        resolution=env.get_map_resolution(),
+        origin=[-padding - env.start_state[0], -padding - env.start_state[1]],
+    )
 
     clearing_footprint_points = footprint.get_clearing_points(map_resolution)
-    clearing_footprint_coords = xy_to_rc(clearing_footprint_points, initial_map).astype(int)
-    initial_map.data[clearing_footprint_coords[:, 0], clearing_footprint_coords[:, 1]] = Costmap.FREE
+    clearing_footprint_coords = xy_to_rc(clearing_footprint_points, initial_map).astype(
+        int
+    )
+    initial_map.data[
+        clearing_footprint_coords[:, 0], clearing_footprint_coords[:, 1]
+    ] = Costmap.FREE
 
-    mapper = LogOddsMapper(initial_map=initial_map,
-                           sensor_range=sensor.get_sensor_range(),
-                           measurement_certainty=0.8,
-                           max_log_odd=8,
-                           min_log_odd=-8,
-                           threshold_occupied=.5,
-                           threshold_free=.5)
+    mapper = LogOddsMapper(
+        initial_map=initial_map,
+        sensor_range=sensor.get_sensor_range(),
+        measurement_certainty=0.8,
+        max_log_odd=8,
+        min_log_odd=-8,
+        threshold_occupied=0.5,
+        threshold_free=0.5,
+    )
 
     # reset the environment to the start state, map the first observations
     pose, [scan_angles, scan_ranges] = env.reset()
 
-    occupancy_map = mapper.update(state=pose, scan_angles=scan_angles, scan_ranges=scan_ranges)
+    occupancy_map = mapper.update(
+        state=pose, scan_angles=scan_angles, scan_ranges=scan_ranges
+    )
 
     if render:
-        visualize(occupancy_map=occupancy_map, state=pose, footprint=footprint,
-                  start_state=start_state, scan_angles=scan_angles, scan_ranges=scan_ranges, path=[],
-                  render_size=render_size, frontiers=[], wait_key=0 if render_wait_for_key else 1)
+        visualize(
+            occupancy_map=occupancy_map,
+            state=pose,
+            footprint=footprint,
+            start_state=start_state,
+            scan_angles=scan_angles,
+            scan_ranges=scan_ranges,
+            path=[],
+            render_size=render_size,
+            frontiers=[],
+            wait_key=0 if render_wait_for_key else 1,
+        )
 
     iteration = 0
     is_last_plan = False
@@ -202,43 +282,77 @@ def run_frontier_exploration(map_filename, params_filename, start_state, sensor_
             if percentage_explored >= completion_percentage:
                 is_last_plan = True
 
-        if max_exploration_iterations is not None and iteration > max_exploration_iterations:
+        if (
+            max_exploration_iterations is not None
+            and iteration > max_exploration_iterations
+        ):
             was_successful = False
             is_last_plan = True
 
         # using the current map, make an action plan
-        path = frontier_agent.plan(state=pose, occupancy_map=occupancy_map, is_last_plan=is_last_plan)
+        path = frontier_agent.plan(
+            state=pose, occupancy_map=occupancy_map, is_last_plan=is_last_plan
+        )
 
         # if we get empty lists for policy/path, that means that the agent was
         # not able to find a path/frontier to plan to.
         if not path.shape[0]:
-            print("No more frontiers! Either the map is 100% explored, or bad start state, or there is a bug!")
+            print(
+                "No more frontiers! Either the map is 100% explored, or bad start state, or there is a bug!"
+            )
             break
 
         # if we have a policy, follow it until the end. update the map sparsely (speeds it up)
         for j, desired_state in enumerate(path):
-            if footprint.check_for_collision(desired_state, occupancy_map, unexplored_is_occupied=True):
-                footprint_coords = footprint.get_ego_points(desired_state[2], map_resolution) + desired_state[:2]
+            if footprint.check_for_collision(
+                desired_state, occupancy_map, unexplored_is_occupied=True
+            ):
+                footprint_coords = (
+                    footprint.get_ego_points(desired_state[2], map_resolution)
+                    + desired_state[:2]
+                )
                 footprint_coords = xy_to_rc(footprint_coords, occupancy_map).astype(int)
-                footprint_coords = footprint_coords[which_coords_in_bounds(footprint_coords, occupancy_map.get_shape())]
-                occupancy_map.data[footprint_coords[:, 0], footprint_coords[:, 1]] = Costmap.FREE
+                footprint_coords = footprint_coords[
+                    which_coords_in_bounds(footprint_coords, occupancy_map.get_shape())
+                ]
+                occupancy_map.data[
+                    footprint_coords[:, 0], footprint_coords[:, 1]
+                ] = Costmap.FREE
 
             pose, [scan_angles, scan_ranges] = env.step(desired_state)
-            occupancy_map = mapper.update(state=pose, scan_angles=scan_angles, scan_ranges=scan_ranges)
+            occupancy_map = mapper.update(
+                state=pose, scan_angles=scan_angles, scan_ranges=scan_ranges
+            )
 
             # put the current laserscan on the map before planning
-            occupied_coords = scan_to_points(scan_angles + pose[2], scan_ranges) + pose[:2]
+            occupied_coords = (
+                scan_to_points(scan_angles + pose[2], scan_ranges) + pose[:2]
+            )
             occupied_coords = xy_to_rc(occupied_coords, occupancy_map).astype(int)
-            occupied_coords = occupied_coords[which_coords_in_bounds(occupied_coords, occupancy_map.get_shape())]
-            occupancy_map.data[occupied_coords[:, 0], occupied_coords[:, 1]] = Costmap.OCCUPIED
+            occupied_coords = occupied_coords[
+                which_coords_in_bounds(occupied_coords, occupancy_map.get_shape())
+            ]
+            occupancy_map.data[
+                occupied_coords[:, 0], occupied_coords[:, 1]
+            ] = Costmap.OCCUPIED
 
             # shows a live visualization of the exploration process if render is set to true
             if render and j % render_interval == 0:
-                visualize(occupancy_map=occupancy_map, state=pose, footprint=footprint,
-                          start_state=start_state, scan_angles=scan_angles, scan_ranges=scan_ranges,
-                          path=path, render_size=render_size,
-                          frontiers=frontier_agent.get_frontiers(compute=True, occupancy_map=occupancy_map), wait_key=1,
-                          path_idx=j)
+                visualize(
+                    occupancy_map=occupancy_map,
+                    state=pose,
+                    footprint=footprint,
+                    start_state=start_state,
+                    scan_angles=scan_angles,
+                    scan_ranges=scan_ranges,
+                    path=path,
+                    render_size=render_size,
+                    frontiers=frontier_agent.get_frontiers(
+                        compute=True, occupancy_map=occupancy_map
+                    ),
+                    wait_key=1,
+                    path_idx=j,
+                )
 
         if is_last_plan:
             break
@@ -257,20 +371,27 @@ def main():
     """
     # big target 270 plans crash
     np.random.seed(3)
-    _, percent_explored, iterations_taken, _ = \
-        run_frontier_exploration(map_filename=os.path.join(get_maps_dir(), "brain/vw_ground_truth_full_edited.png"),
-                                 params_filename=os.path.join(get_exploration_dir(), "params/params.yaml"),
-                                 map_resolution=0.03,
-                                 start_state=None,
-                                 sensor_range=10.0,
-                                 completion_percentage=0.98,
-                                 max_exploration_iterations=None,
-                                 render_size_scale=2.0,
-                                 render_interval=5)
+    _, percent_explored, iterations_taken, _ = run_frontier_exploration(
+        map_filename=os.path.join(
+            get_maps_dir(), "brain/vw_ground_truth_full_edited.png"
+        ),
+        params_filename=os.path.join(get_exploration_dir(), "params/params.yaml"),
+        map_resolution=0.03,
+        start_state=None,
+        sensor_range=10.0,
+        completion_percentage=0.98,
+        max_exploration_iterations=None,
+        render_size_scale=2.0,
+        render_interval=5,
+    )
 
-    print("Map", "{:.2f}".format(percent_explored * 100), "\b% explored!",
-          "This is " + str(iterations_taken) + " iterations!")
+    print(
+        "Map",
+        "{:.2f}".format(percent_explored * 100),
+        "\b% explored!",
+        "This is " + str(iterations_taken) + " iterations!",
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

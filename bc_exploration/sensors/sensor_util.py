@@ -40,20 +40,35 @@ def bresenham2d_with_intensities(p1, p2, img):
     # line[:, 2].fill(np.nan)
 
     tmp = fast_bresenham2d(p1_x, p1_y, p2_x, p2_y)
-    if (p1_x < 0) or (p1_y < 0) or (p1_x >= image_width) or (p1_y >= image_height) or \
-        (p2_x < 0) or (p2_y < 0) or (p2_x >= image_width) or (p2_y >= image_height):
-        mask = (tmp[0] >= 0) & (tmp[0] < image_width) & (tmp[1] >= 0) & (tmp[1] < image_height)
+    if (
+        (p1_x < 0)
+        or (p1_y < 0)
+        or (p1_x >= image_width)
+        or (p1_y >= image_height)
+        or (p2_x < 0)
+        or (p2_y < 0)
+        or (p2_x >= image_width)
+        or (p2_y >= image_height)
+    ):
+        mask = (
+            (tmp[0] >= 0)
+            & (tmp[0] < image_width)
+            & (tmp[1] >= 0)
+            & (tmp[1] < image_height)
+        )
         col_x = tmp[0][mask]
         col_y = tmp[1][mask]
     else:
         col_x = tmp[0]
         col_y = tmp[1]
     intensity = img[col_y, col_x][:, np.newaxis].astype(np.float32)
-    line = np.hstack([
-        col_x[:, np.newaxis].astype(np.float32),
-        col_y[:, np.newaxis].astype(np.float32),
-        intensity
-    ])
+    line = np.hstack(
+        [
+            col_x[:, np.newaxis].astype(np.float32),
+            col_y[:, np.newaxis].astype(np.float32),
+            intensity,
+        ]
+    )
 
     # line = np.empty(shape=(max(dy_abs, dx_abs) + 1, 3), dtype=np.float32)
     # line[:, 0] = tmp[0]
@@ -110,9 +125,22 @@ def bresenham2d_within_image(p1, p2, image_height, image_width):
 
     tmp = fast_bresenham2d(p1_x, p1_y, p2_x, p2_y)
     line = np.hstack([tmp[0][:, np.newaxis], tmp[1][:, np.newaxis]]).astype(np.float32)
-    if (p1_x < 0) or (p1_y < 0) or (p1_x >= image_width) or (p1_y >= image_height) or \
-       (p2_x < 0) or (p2_y < 0) or (p2_x >= image_width) or (p2_y >= image_height):
-        mask = (tmp[0] >= 0) & (tmp[0] < image_width) & (tmp[1] >= 0) & (tmp[1] < image_height)
+    if (
+        (p1_x < 0)
+        or (p1_y < 0)
+        or (p1_x >= image_width)
+        or (p1_y >= image_height)
+        or (p2_x < 0)
+        or (p2_y < 0)
+        or (p2_x >= image_width)
+        or (p2_y >= image_height)
+    ):
+        mask = (
+            (tmp[0] >= 0)
+            & (tmp[0] < image_width)
+            & (tmp[1] >= 0)
+            & (tmp[1] < image_height)
+        )
         return line[mask, :]
 
     return line
@@ -145,8 +173,20 @@ def bresenham2d(p0, p1):
     if dy == 0:
         q = np.zeros((dx + 1, 1))
     else:
-        q = np.append(0, np.greater_equal(
-            np.diff(np.mod(np.arange(np.floor(dx / 2), -dy * dx + np.floor(dx / 2) - 1, -dy), dx)), 0))
+        q = np.append(
+            0,
+            np.greater_equal(
+                np.diff(
+                    np.mod(
+                        np.arange(
+                            np.floor(dx / 2), -dy * dx + np.floor(dx / 2) - 1, -dy
+                        ),
+                        dx,
+                    )
+                ),
+                0,
+            ),
+        )
     if steep:
         if y0 <= y1:
             y = np.arange(y0, y1 + 1)
