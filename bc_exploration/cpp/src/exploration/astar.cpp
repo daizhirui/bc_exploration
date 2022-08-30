@@ -462,20 +462,6 @@ namespace exploration {
                 if (computeIt) {
 
                     try {
-                        // sharedResource->out[index] = orientedAstar(
-                        //     sharedResource->start,
-                        //     sharedResource->goals.row(index).transpose(),
-                        //     sharedResource->occupancyMap,
-                        //     sharedResource->footprintMasks,
-                        //     sharedResource->maskAngles,
-                        //     sharedResource->outlineCoords,
-                        //     sharedResource->obstacleValues,
-                        //     sharedResource->delta,
-                        //     sharedResource->epsilon,
-                        //     sharedResource->planningScale,
-                        //     sharedResource->allowDiagonal,
-                        //     sharedResource->threadLogStreams[index]);
-
                         auto &start = sharedResource->start;
                         auto &goal = sharedResource->goals.row(index).transpose();
                         auto &occupancyMap = sharedResource->occupancyMap;
