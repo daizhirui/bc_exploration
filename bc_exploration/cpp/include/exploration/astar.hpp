@@ -64,4 +64,19 @@ namespace exploration {
         int planningScale,
         bool allowDiagonal,
         bool parallel = false);
+
+    std::vector<std::pair<bool, Eigen::MatrixX3f>>
+    orientedAstarPrioritizedMultiGoals(
+        const Eigen::Ref<const Eigen::Vector2i> &start,
+        const Eigen::Ref<const Eigen::MatrixX2i> &goals,
+        const Eigen::Ref<const Eigen::VectorXf> &goalInitPriorities,
+        const Eigen::Ref<const Eigen::MatrixX<uint8_t>> &occupancyMap,
+        const std::vector<Eigen::Ref<const Eigen::MatrixX<bool>>> &footprintMasks,
+        const Eigen::Ref<const Eigen::VectorXf> &maskAngles,
+        const std::vector<Eigen::Ref<const Eigen::MatrixX<int>>> &outlineCoords,
+        const Eigen::Ref<const Eigen::VectorX<uint8_t>> &obstacleValues,
+        float delta,
+        float epsilon,
+        int planningScale,
+        bool allowDiagonal);
 }  // namespace exploration

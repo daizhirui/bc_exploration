@@ -8,6 +8,7 @@ from bc_exploration._exploration_cpp import (
     c_astar,
     c_oriented_astar,
     c_oriented_astar_multi_goals,
+    c_oriented_astar_prioritized_multi_goals,
     c_get_astar_angles,
     c_check_for_collision,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "c_astar",
     "c_oriented_astar",
     "c_oriented_astar_multi_goals",
+    "c_oriented_astar_prioritized_multi_goals",
     "c_get_astar_angles",
     "c_check_for_collision",
 ]

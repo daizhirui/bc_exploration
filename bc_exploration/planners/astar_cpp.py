@@ -3,6 +3,8 @@ Contains python wrappers for c++ code for astar planning.
 """
 from __future__ import print_function, absolute_import, division
 
+import time
+
 import numpy as np
 
 from bc_exploration.utilities.util import xy_to_rc, rc_to_xy
@@ -10,6 +12,7 @@ from bc_exploration.cpp import (
     c_astar,
     c_oriented_astar,
     c_oriented_astar_multi_goals,
+    c_oriented_astar_prioritized_multi_goals,
     c_get_astar_angles,
 )
 
@@ -157,6 +160,8 @@ def oriented_astar_multi_goals(
     allow_diagonal=True,
     parallel=False,
 ):
+    t0 = time.time()
+
     c_angles = np.array(c_get_astar_angles(), dtype=np.float32)
 
     start_px = xy_to_rc(start, occupancy_map)
@@ -199,4 +204,71 @@ def oriented_astar_multi_goals(
         path[:1, :] = start
         path[1:, :] = rc_to_xy(path_px, occupancy_map)
         paths.append(path)
+
+    print('oriented_astar_multi_goals:', time.time() - t0, 'sec')
     return success_flags, paths  # np.vstack([[start], path])
+
+
+def oriented_astar_prioritized_multi_goals(
+    goals,
+    goal_init_priorities,
+    start,
+    occupancy_map,
+    footprint_masks,
+    outline_coords,
+    obstacle_values,
+    planning_scale=1,
+    delta=0.0,
+    epsilon=1.0,
+    allow_diagonal=True,
+    parallel=False,
+):
+    t0 = time.time()
+
+    c_angles = np.array(c_get_astar_angles(), dtype=np.float32)
+
+    start_px = xy_to_rc(start, occupancy_map)
+    c_start = np.array(start_px[:2], dtype=np.int32)
+
+    goals_px = xy_to_rc(goals[:, :2], occupancy_map)
+    c_goals = np.array(goals_px, dtype=np.int32)
+
+    c_goal_init_priorities = np.array(goal_init_priorities, dtype=np.float32)
+
+    c_occupancy_map = occupancy_map.data.astype(np.uint8)
+
+    c_footprint_masks = np.logical_not(np.array(footprint_masks, dtype=np.bool))
+    c_footprint_masks = [c_footprint_mask for c_footprint_mask in c_footprint_masks]
+
+    c_outline_coords = np.array(outline_coords, dtype=np.int32)
+    c_outline_coords = [c_outline_coord for c_outline_coord in c_outline_coords]
+
+    c_obstacle_values = np.array(obstacle_values, dtype=np.uint8)
+
+    outs = c_oriented_astar_prioritized_multi_goals(
+        c_start,
+        c_goals,
+        c_goal_init_priorities,
+        c_occupancy_map,
+        c_footprint_masks,
+        c_angles,
+        c_outline_coords,
+        c_obstacle_values,
+        delta,
+        epsilon,
+        planning_scale,
+        allow_diagonal
+    )
+
+    success_flags = []
+    paths = []
+    for out in outs:
+        success_flags.append(out[0])
+        path_px = out[1]
+        path = np.empty((1 + path_px.shape[0], path_px.shape[1]))
+        path[:1, :] = start
+        path[1:, :] = rc_to_xy(path_px, occupancy_map)
+        paths.append(path)
+
+    print('oriented_astar_prioritized_multi_goals:', time.time() - t0, 'sec')
+    return success_flags, paths

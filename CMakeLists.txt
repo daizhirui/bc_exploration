@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 project(bc_exploration)
 
+if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_definitions(-DNDEBUG)
+endif()
+
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -34,4 +38,4 @@ set(SOURCE_FILES
 #set_target_properties(exploration_cpp PROPERTIES SUFFIX ".so" PREFIX "_")
 
 pybind11_add_module(_exploration_cpp ${SOURCE_FILES} NO_EXTRAS)
-target_link_libraries(_exploration_cpp PUBLIC ${PYTHON_LIBRARIES} OpenMP::OpenMP_CXX)
+target_link_libraries(_exploration_cpp PUBLIC ${PYTHON_LIBRARIES} pthread OpenMP::OpenMP_CXX)

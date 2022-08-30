@@ -63,7 +63,7 @@ PYBIND11_MODULE(_exploration_cpp, m) {
             "c_oriented_astar_multi_goals",
             &exploration::orientedAstarMultiGoals,
             py::arg("start"),
-            py::arg("goal"),
+            py::arg("goals"),
             py::arg("occupancy_map"),
             py::arg("footprint_masks"),
             py::arg("mask_angles"),
@@ -73,5 +73,21 @@ PYBIND11_MODULE(_exploration_cpp, m) {
             py::arg("epsilon"),
             py::arg("planning_scale"),
             py::arg("allow_diagonal"),
-            py::arg("parallel") = false);
+            py::arg("parallel") = false)
+        .def(
+            "c_oriented_astar_prioritized_multi_goals",
+            &exploration::orientedAstarPrioritizedMultiGoals,
+            py::arg("start"),
+            py::arg("goals"),
+            py::arg("goal_init_priorities"),
+            py::arg("occupancy_map"),
+            py::arg("footprint_masks"),
+            py::arg("mask_angles"),
+            py::arg("outline_coords"),
+            py::arg("obstacle_values"),
+            py::arg("delta"),
+            py::arg("epsilon"),
+            py::arg("planning_scale"),
+            py::arg("allow_diagonal")
+            );
 }
