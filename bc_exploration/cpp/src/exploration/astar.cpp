@@ -637,9 +637,10 @@ namespace exploration {
                                 protectedResource.maxFeasibleHeuristic = sharedResource->newHeuristics[index];
                             }
                             protectedResource.inProcessIndices[threadId] = -1;
-                            std::cout << index << ": heuristic " << protectedResource.heuristics[index] << " -> " << sharedResource->newHeuristics[index]
-                                      << ", maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
                         }
+
+                        ostream << index << ": heuristic " << protectedResource.heuristics[index] << " -> " << sharedResource->newHeuristics[index]
+                                << ", maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
 
                         sharedResource->skipFlags[index] = false;
                     } catch (const std::logic_error &e) {
@@ -652,11 +653,6 @@ namespace exploration {
                 }
             }
         } while (running);
-
-        {
-            std::unique_lock<std::mutex> lk(resourceMutex);
-            std::cout << "thread" << threadId << " exit." << std::endl;
-        }
     }
 
     std::vector<std::pair<bool, Eigen::MatrixX3f>>
@@ -689,6 +685,8 @@ namespace exploration {
             protectedResource.heuristics[i] = goalInitPriorities.coeffRef(i) / (start - goals.row(i).transpose()).cast<float>().norm();
             protectedResource.priorityQueue.push(i);
         }
+
+        std::cout << "maxPredictedHeuristic: " << protectedResource.heuristics[protectedResource.priorityQueue.top()] << std::endl;
 
         auto sharedResource = std::make_shared<SharedResource>(SharedResource{
             start,
