@@ -608,7 +608,7 @@ namespace exploration {
                             currentAngle = maskAngles.coeffRef(pathsAngleInds[currentIdx]);
                         }
 
-                        auto pathPX = Eigen::MatrixX3f(pathStack.size(), 3);  // FIXME: may be ZERO!!!
+                        auto pathPX = Eigen::MatrixX3f(pathStack.size(), 3);
                         int i = 0;
                         int coord[2];
                         while (!pathStack.empty()) {
@@ -637,10 +637,9 @@ namespace exploration {
                                 protectedResource.maxFeasibleHeuristic = sharedResource->newHeuristics[index];
                             }
                             protectedResource.inProcessIndices[threadId] = -1;
+                            std::cout << index << ": heuristic " << protectedResource.heuristics[index] << " -> " << sharedResource->newHeuristics[index]
+                                    << ", maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
                         }
-
-                        ostream << index << ": heuristic " << protectedResource.heuristics[index] << " -> " << sharedResource->newHeuristics[index]
-                                << ", maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
 
                         sharedResource->skipFlags[index] = false;
                     } catch (const std::logic_error &e) {
