@@ -638,7 +638,7 @@ namespace exploration {
                             }
                             protectedResource.inProcessIndices[threadId] = -1;
                             std::cout << index << ": heuristic " << protectedResource.heuristics[index] << " -> " << sharedResource->newHeuristics[index]
-                                    << ", maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
+                                      << ", maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
                         }
 
                         sharedResource->skipFlags[index] = false;
@@ -706,9 +706,6 @@ namespace exploration {
             std::vector<std::pair<bool, std::string>>(n),       // threadErrorMessages
             std::vector<std::stringstream>(n)});                // threadLogStreams
 
-        // std::promise<void> exitSignal;
-        // future cannot be consumed multiple times.
-        // std::shared_future<void> future = exitSignal.get_future();  // we should use shared_future to make the future copyable across threads
         std::vector<std::thread> threads;
         threads.reserve(numThreads);
         for (size_t i = 0; i < numThreads; ++i) { threads.emplace_back(&threadWorkerForOrientedAstarPrioritizedMultiGoals, i, sharedResource); }
@@ -718,7 +715,11 @@ namespace exploration {
             {
                 std::unique_lock<std::mutex> lk(resourceMutex);
                 auto maxHeuristicInProcess = protectedResource.maxHeuristicInProcess();
-                if (protectedResource.maxFeasibleHeuristic > maxHeuristicInProcess) {
+                if (maxHeuristicInProcess == 0) {
+                    wait = false;
+                    protectedResource.exit = true;
+                    std::cout << "no feasible path is found." << std::endl;
+                } else if (protectedResource.maxFeasibleHeuristic > maxHeuristicInProcess) {
                     wait = false;
                     protectedResource.exit = true;
                     std::cout << "exit in advance, maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
