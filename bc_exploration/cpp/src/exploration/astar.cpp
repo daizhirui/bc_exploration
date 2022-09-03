@@ -534,6 +534,9 @@ namespace exploration {
 
                         std::vector<bool> closeSet(occupancyMap.size(), false);
 
+                        std::vector<std::vector<int8_t>> collisionCheckCache;
+                        for (int i = 0; i < 8; ++i) { collisionCheckCache.emplace_back(occupancyMap.size(), -1); }
+
                         std::vector<float> costs(occupancyMap.size(), inf);
                         costs[startIdx] = 0.0;
 
@@ -610,7 +613,15 @@ namespace exploration {
                                     continue;  // this child is in the CLOSE set
                                 }
 
-                                if (checkForCollision(child, occupancyMap, footprintMasks[c], outlineCoords[c], obstacleValues)) { continue; }
+                                if (collisionCheckCache[c][childIdx] == -1) {
+                                    if (checkForCollision(child, occupancyMap, footprintMasks[c], outlineCoords[c], obstacleValues)) {
+                                        collisionCheckCache[c][childIdx] = 1;
+                                    } else {
+                                        collisionCheckCache[c][childIdx] = 0;
+                                    }
+                                }
+                                // if (checkForCollision(child, occupancyMap, footprintMasks[c], outlineCoords[c], obstacleValues)) { continue; }
+                                if (collisionCheckCache[c][childIdx] == 1) { continue; }
 
                                 float g = costs[parent.idx] + euclidean(parentCoord[0], parentCoord[1], children[c][0], children[c][1]);
 
