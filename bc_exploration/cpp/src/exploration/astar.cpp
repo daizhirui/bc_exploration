@@ -532,7 +532,7 @@ namespace exploration {
                         std::priority_queue<Node, std::vector<Node>, std::greater<>> openSet;
                         openSet.push(startNode);
 
-                        // std::vector<bool> closeSet(occupancyMap.size(), false);
+                        std::vector<bool> closeSet(occupancyMap.size(), false);
 
                         std::vector<float> costs(occupancyMap.size(), inf);
                         costs[startIdx] = 0.0;
@@ -560,7 +560,7 @@ namespace exploration {
                             openSet.pop();
 
                             index1dTo2d(parent.idx, mapShape[1], parentCoord[0], parentCoord[1]);
-                            // closeSet[parent.idx] = true;
+                            closeSet[parent.idx] = true;
 
                             float distanceToGoal = euclidean(parentCoord[0], parentCoord[1], goal.x(), goal.y());
 
@@ -606,9 +606,9 @@ namespace exploration {
                                 // check if child is in CLOSE set!
                                 Eigen::Map<Eigen::Vector2i> child = Eigen::Map<Eigen::Vector2i>(children[c]);
                                 int childIdx = index2dTo1d(child.x(), child.y(), mapShape[1]);
-                                // if (closeSet[childIdx]) {
-                                //     continue;  // this child is in the CLOSE set
-                                // }
+                                if (closeSet[childIdx]) {
+                                    continue;  // this child is in the CLOSE set
+                                }
 
                                 if (checkForCollision(child, occupancyMap, footprintMasks[c], outlineCoords[c], obstacleValues)) { continue; }
 
