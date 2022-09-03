@@ -32,7 +32,7 @@ namespace exploration {
         const float inf = std::numeric_limits<float>::infinity();
 
         int mapShape[2] = {(int) occupancyMap.rows(), (int) occupancyMap.cols()};
-        int numCells = (int) occupancyMap.size();
+        auto numCells = (int) occupancyMap.size();
         const int startIdx = index2dTo1d(start.coeffRef(0), start.coeffRef(1), mapShape[1]);
 
         for (int i = 0; i < obstacleValues.size(); i++) {
@@ -46,6 +46,8 @@ namespace exploration {
 
         std::priority_queue<Node, std::vector<Node>, std::greater<>> openSet;
         openSet.push(startNode);
+
+        std::vector<bool> closeSet(numCells, false);
 
         std::vector<float> costs(numCells, inf);
         costs[startIdx] = 0.0;
@@ -63,6 +65,7 @@ namespace exploration {
             openSet.pop();
 
             index1dTo2d(parent.idx, mapShape[1], parentCoord[0], parentCoord[1]);
+            closeSet[parent.idx] = true;
 
             // todo planningScale + delta is not quite right, maybe max(planningScale, delta) is correct
             float distance_to_goal = euclidean(parentCoord[0], parentCoord[1], goal.x(), goal.y());
@@ -96,6 +99,12 @@ namespace exploration {
                 // skip child if out of bounds
                 if (children[c][0] < 0 || children[c][0] >= mapShape[0] || children[c][1] < 0 || children[c][1] >= mapShape[1]) { continue; }
 
+                // check if child is in CLOSE set!
+                int childIdx = index2dTo1d(children[c][0], children[c][1], mapShape[1]);
+                if (closeSet[childIdx]) {
+                    continue;  // this child is in the CLOSE set
+                }
+
                 // skip child if it lies on an obstacle
                 bool onObstacle = false;
                 for (int i = 0; i < obstacleValues.size(); i++) {
@@ -106,7 +115,6 @@ namespace exploration {
 
                 float g = costs[parent.idx] + euclidean(parentCoord[0], parentCoord[1], children[c][0], children[c][1]);
 
-                int childIdx = index2dTo1d(children[c][0], children[c][1], mapShape[1]);
                 if (costs[childIdx] > g) {
                     costs[childIdx] = g;
                     paths[childIdx] = parent.idx;
@@ -191,6 +199,8 @@ namespace exploration {
         std::priority_queue<Node, std::vector<Node>, std::greater<>> openSet;
         openSet.push(startNode);
 
+        std::vector<bool> closeSet(occupancyMap.size(), false);
+
         std::vector<float> costs(occupancyMap.size(), inf);
         costs[startIdx] = 0.0;
 
@@ -210,6 +220,7 @@ namespace exploration {
             openSet.pop();
 
             index1dTo2d(parent.idx, mapShape[1], parentCoord[0], parentCoord[1]);
+            closeSet[parent.idx] = true;
 
             float distanceToGoal = euclidean(parentCoord[0], parentCoord[1], goal.x(), goal.y());
 
@@ -252,13 +263,17 @@ namespace exploration {
                 // skip child if out of bounds
                 if (children[c][0] < 0 || children[c][0] >= mapShape[0] || children[c][1] < 0 || children[c][1] >= mapShape[1]) { continue; }
 
+                // check if child is in CLOSE set!
                 Eigen::Map<Eigen::Vector2i> child = Eigen::Map<Eigen::Vector2i>(children[c]);
+                int childIdx = index2dTo1d(child.x(), child.y(), mapShape[1]);
+                if (closeSet[childIdx]) {
+                    continue;  // this child is in the CLOSE set
+                }
 
                 if (checkForCollision(child, occupancyMap, footprintMasks[c], outlineCoords[c], obstacleValues)) { continue; }
 
                 float g = costs[parent.idx] + euclidean(parentCoord[0], parentCoord[1], children[c][0], children[c][1]);
 
-                int childIdx = index2dTo1d(child.x(), child.y(), mapShape[1]);
                 if (costs[childIdx] > g) {
                     costs[childIdx] = g;
                     paths[childIdx] = parent.idx;
@@ -280,7 +295,7 @@ namespace exploration {
             currentAngle = maskAngles.coeffRef(pathsAngleInds[currentIdx]);
         }
 
-        auto pathPX = Eigen::MatrixX3f(pathStack.size(), 3);  // FIXME: may be ZERO!!!
+        auto pathPX = Eigen::MatrixX3f(pathStack.size(), 3);
         int i = 0;
         int coord[2];
         while (!pathStack.empty()) {
@@ -517,6 +532,8 @@ namespace exploration {
                         std::priority_queue<Node, std::vector<Node>, std::greater<>> openSet;
                         openSet.push(startNode);
 
+                        // std::vector<bool> closeSet(occupancyMap.size(), false);
+
                         std::vector<float> costs(occupancyMap.size(), inf);
                         costs[startIdx] = 0.0;
 
@@ -543,6 +560,7 @@ namespace exploration {
                             openSet.pop();
 
                             index1dTo2d(parent.idx, mapShape[1], parentCoord[0], parentCoord[1]);
+                            // closeSet[parent.idx] = true;
 
                             float distanceToGoal = euclidean(parentCoord[0], parentCoord[1], goal.x(), goal.y());
 
@@ -585,13 +603,17 @@ namespace exploration {
                                 // skip child if out of bounds
                                 if (children[c][0] < 0 || children[c][0] >= mapShape[0] || children[c][1] < 0 || children[c][1] >= mapShape[1]) { continue; }
 
+                                // check if child is in CLOSE set!
                                 Eigen::Map<Eigen::Vector2i> child = Eigen::Map<Eigen::Vector2i>(children[c]);
+                                int childIdx = index2dTo1d(child.x(), child.y(), mapShape[1]);
+                                // if (closeSet[childIdx]) {
+                                //     continue;  // this child is in the CLOSE set
+                                // }
 
                                 if (checkForCollision(child, occupancyMap, footprintMasks[c], outlineCoords[c], obstacleValues)) { continue; }
 
                                 float g = costs[parent.idx] + euclidean(parentCoord[0], parentCoord[1], children[c][0], children[c][1]);
 
-                                int childIdx = index2dTo1d(child.x(), child.y(), mapShape[1]);
                                 if (costs[childIdx] > g) {
                                     costs[childIdx] = g;
                                     paths[childIdx] = parent.idx;
@@ -680,11 +702,11 @@ namespace exploration {
         bool allowDiagonal) {
 
         auto n = goals.rows();
-#if defined(NDEBUG)
+        // #if defined(NDEBUG)
         auto numThreads = std::thread::hardware_concurrency();
-#else
-        ssize_t numThreads = 2;
-#endif
+        // #else
+        //         ssize_t numThreads = 2;
+        // #endif
         if (n < numThreads) { numThreads = n; }
 
         std::cout << "shape of goals: (" << n << ", " << goals.cols() << ")" << std::endl;
@@ -718,7 +740,7 @@ namespace exploration {
 
         std::vector<std::thread> threads;
         threads.reserve(numThreads);
-        for (size_t i = 0; i < numThreads; ++i) { threads.emplace_back(&threadWorkerForOrientedAstarPrioritizedMultiGoals, i, sharedResource); }
+        for (ssize_t i = 0; i < numThreads; ++i) { threads.emplace_back(&threadWorkerForOrientedAstarPrioritizedMultiGoals, i, sharedResource); }
 
         bool wait = true;
         while (wait) {
