@@ -715,11 +715,7 @@ namespace exploration {
             {
                 std::unique_lock<std::mutex> lk(resourceMutex);
                 auto maxHeuristicInProcess = protectedResource.maxHeuristicInProcess();
-                if (maxHeuristicInProcess == 0) {
-                    wait = false;
-                    protectedResource.exit = true;
-                    std::cout << "no feasible path is found." << std::endl;
-                } else if (protectedResource.maxFeasibleHeuristic > maxHeuristicInProcess) {
+                if (protectedResource.maxFeasibleHeuristic >= maxHeuristicInProcess) {
                     wait = false;
                     protectedResource.exit = true;
                     std::cout << "exit in advance, maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
