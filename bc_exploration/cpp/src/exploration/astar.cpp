@@ -412,6 +412,7 @@ namespace exploration {
         std::function<bool(const int &, const int &)> cmp = [&](const int &left, const int &right) { return heuristics[left] < heuristics[right]; };
         std::priority_queue<int, std::vector<int>, decltype(cmp)> priorityQueue;
         std::vector<int> inProcessIndices;
+        int numInProcessIndices = 0;
         bool exit = false;
 
         ProtectedResource()
@@ -430,8 +431,12 @@ namespace exploration {
         float
         maxHeuristicInProcess() {
             float out = 0;
+            numInProcessIndices = 0;
             for (auto &index: inProcessIndices) {
-                if ((index != -1) && (heuristics[index] > out)) { out = heuristics[index]; }
+                if (index != -1) {
+                    numInProcessIndices++;
+                    if (heuristics[index] > out) { out = heuristics[index]; }
+                }
             }
             return out;
         }
@@ -625,7 +630,7 @@ namespace exploration {
                             ostream << ", path (" << pathPX.coeffRef(0, 0) << ", " << pathPX.coeffRef(0, 1) << ") -> (" << pathPX.coeffRef(n - 1, 0) << ", "
                                     << pathPX.coeffRef(n - 1, 1) << "), length: " << n;
                         }
-                        ostream << ", successful: " << isSuccessful << std::endl;
+                        ostream << ", successful: " << isSuccessful;
 
                         sharedResource->out[index].first = isSuccessful;
                         sharedResource->out[index].second = pathPX;
@@ -633,6 +638,11 @@ namespace exploration {
 
                         {
                             std::unique_lock<std::mutex> lk(resourceMutex);
+                            if (sharedResource->newHeuristics[index] > protectedResource.heuristics[index]) {
+                                std::cout << index << ": update heuristic prediction from " << protectedResource.heuristics[index] << " to "
+                                          << sharedResource->newHeuristics[index] << std::endl;
+                                protectedResource.heuristics[index] = sharedResource->newHeuristics[index];
+                            }
                             if (sharedResource->newHeuristics[index] > protectedResource.maxFeasibleHeuristic) {
                                 protectedResource.maxFeasibleHeuristic = sharedResource->newHeuristics[index];
                             }
@@ -672,10 +682,10 @@ namespace exploration {
         auto n = goals.rows();
 #if defined(NDEBUG)
         auto numThreads = std::thread::hardware_concurrency();
-        if (n < numThreads) { numThreads = n; }
 #else
-        size_t numThreads = 1;
+        ssize_t numThreads = 2;
 #endif
+        if (n < numThreads) { numThreads = n; }
 
         std::cout << "shape of goals: (" << n << ", " << goals.cols() << ")" << std::endl;
 
@@ -712,16 +722,18 @@ namespace exploration {
 
         bool wait = true;
         while (wait) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             {
                 std::unique_lock<std::mutex> lk(resourceMutex);
                 auto maxHeuristicInProcess = protectedResource.maxHeuristicInProcess();
-                if (protectedResource.maxFeasibleHeuristic >= maxHeuristicInProcess) {
+                if (protectedResource.maxFeasibleHeuristic >= maxHeuristicInProcess * 1.1) {
                     wait = false;
                     protectedResource.exit = true;
-                    std::cout << "exit in advance, maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
+                    if (protectedResource.numInProcessIndices > 0) {
+                        std::cout << "exit in advance, maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
+                    }
                 }
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         for (auto &thread: threads) { thread.join(); }
@@ -732,11 +744,12 @@ namespace exploration {
 
         for (int i = 0; i < n; ++i) {
             std::cout << i << ": initPriority=" << goalInitPriorities[i] << ", heuristic=" << protectedResource.heuristics[i]
-                      << ", newHeuristic=" << sharedResource->newHeuristics[i] << ", ";
+                      << ", newHeuristic=" << sharedResource->newHeuristics[i] << ", " << sharedResource->threadLogStreams[i].str();
+
             if (sharedResource->skipFlags[i]) {
-                std::cout << "skipped" << std::endl;
+                std::cout << " [skipped]." << std::endl;
             } else {
-                std::cout << sharedResource->threadLogStreams[i].str();
+                std::cout << " [done]." << std::endl;
             }
         }
 
