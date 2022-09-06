@@ -422,25 +422,19 @@ namespace exploration {
     // protected by lock
     struct ProtectedResource {
         float maxFeasibleHeuristic = 0;
-        std::vector<int> computeOrders;
-        std::vector<float> heuristics;
-        std::function<bool(const int &, const int &)> cmp = [&](const int &left, const int &right) { return heuristics[left] < heuristics[right]; };
-        std::priority_queue<int, std::vector<int>, decltype(cmp)> priorityQueue;
-        std::vector<int> inProcessIndices;
+        std::vector<int> computeOrders{};
+        std::vector<float> heuristics{};
+        std::priority_queue<int, std::vector<int>, std::function<bool(const int &, const int &)>> priorityQueue{};
+        std::vector<int> inProcessIndices{};
         int numInProcessIndices = 0;
-        bool exit = false;
-
-        ProtectedResource()
-            : priorityQueue(cmp) {}
 
         void
         reset(size_t n, size_t numThreads) {
             maxFeasibleHeuristic = 0;
             computeOrders.clear();
             heuristics.resize(n);
-            priorityQueue = decltype(priorityQueue)(cmp);
+            priorityQueue = decltype(priorityQueue)([&](const int &left, const int &right) { return heuristics[left] < heuristics[right]; });
             inProcessIndices.resize(numThreads, -1);
-            exit = false;
         }
 
         float
@@ -460,15 +454,15 @@ namespace exploration {
     ProtectedResource protectedResource;
 
     static void
-    threadWorkerForOrientedAstarPrioritizedMultiGoals(int threadId, const std::shared_ptr<SharedResource> &sharedResource) {
+    threadWorkerForOrientedAstarPrioritizedMultiGoals(int threadId, std::future<void> exitSignal, const std::shared_ptr<SharedResource> &sharedResource) {
 
-        bool running;
+        bool running = true;
         int index;
         bool computeIt;
-        do {
+        while (running && exitSignal.wait_for(std::chrono::nanoseconds(1)) == std::future_status::timeout) {
             {
                 std::unique_lock<std::mutex> lk(resourceMutex);
-                running = !protectedResource.priorityQueue.empty() && !protectedResource.exit;
+                running = !protectedResource.priorityQueue.empty(); // && !protectedResource.exit;
                 if (running) {
                     index = protectedResource.priorityQueue.top();
                     protectedResource.inProcessIndices[threadId] = index;
@@ -552,11 +546,8 @@ namespace exploration {
                         int numNodesExpanded = 0;
                         bool isSuccessful = false;
                         while (!openSet.empty()) {
-                            if (numNodesExpanded % 100 == 0) {
-                                {
-                                    std::unique_lock<std::mutex> lk(resourceMutex);
-                                    if (protectedResource.exit) { return; }
-                                }
+                            if (exitSignal.wait_for(std::chrono::nanoseconds(1)) != std::future_status::timeout) {
+                                return;
                             }
 
                             Node parent = openSet.top();
@@ -694,7 +685,7 @@ namespace exploration {
                     sharedResource->out[index].second = Eigen::MatrixX3f(0, 3);
                 }
             }
-        } while (running);
+        } // while (running);
     }
 
     std::vector<std::pair<bool, Eigen::MatrixX3f>>
@@ -713,11 +704,7 @@ namespace exploration {
         bool allowDiagonal) {
 
         auto n = goals.rows();
-        // #if defined(NDEBUG)
         auto numThreads = std::thread::hardware_concurrency();
-        // #else
-        //         ssize_t numThreads = 2;
-        // #endif
         if (n < numThreads) { numThreads = n; }
 
         std::cout << "shape of goals: (" << n << ", " << goals.cols() << ")" << std::endl;
@@ -749,9 +736,13 @@ namespace exploration {
             std::vector<std::pair<bool, std::string>>(n),       // threadErrorMessages
             std::vector<std::stringstream>(n)});                // threadLogStreams
 
+        std::vector<std::promise<void>> exitSignals;
         std::vector<std::thread> threads;
         threads.reserve(numThreads);
-        for (ssize_t i = 0; i < numThreads; ++i) { threads.emplace_back(&threadWorkerForOrientedAstarPrioritizedMultiGoals, i, sharedResource); }
+        for (ssize_t i = 0; i < numThreads; ++i) {
+            exitSignals.emplace_back();
+            threads.emplace_back(&threadWorkerForOrientedAstarPrioritizedMultiGoals, i, exitSignals.back().get_future(), sharedResource);
+        }
 
         bool wait = true;
         while (wait) {
@@ -761,9 +752,12 @@ namespace exploration {
                 auto maxHeuristicInProcess = protectedResource.maxHeuristicInProcess();
                 if (protectedResource.maxFeasibleHeuristic >= maxHeuristicInProcess * 1.1) {
                     wait = false;
-                    protectedResource.exit = true;
+                    // protectedResource.exit = true;
                     if (protectedResource.numInProcessIndices > 0) {
                         std::cout << "exit in advance, maxFeasibleHeuristic = " << protectedResource.maxFeasibleHeuristic << std::endl;
+                        for (auto &exitSignal : exitSignals) {
+                            exitSignal.set_value();
+                        }
                     }
                 }
             }
