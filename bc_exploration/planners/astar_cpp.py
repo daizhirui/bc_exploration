@@ -205,7 +205,7 @@ def oriented_astar_multi_goals(
         path[1:, :] = rc_to_xy(path_px, occupancy_map)
         paths.append(path)
 
-    print('oriented_astar_multi_goals:', time.time() - t0, 'sec')
+    print("oriented_astar_multi_goals:", time.time() - t0, "sec")
     return success_flags, paths  # np.vstack([[start], path])
 
 
@@ -257,7 +257,7 @@ def oriented_astar_prioritized_multi_goals(
         delta,
         epsilon,
         planning_scale,
-        allow_diagonal
+        allow_diagonal,
     )
 
     success_flags = []
@@ -270,5 +270,5 @@ def oriented_astar_prioritized_multi_goals(
         path[1:, :] = rc_to_xy(path_px, occupancy_map)
         paths.append(path)
 
-    print('oriented_astar_prioritized_multi_goals:', time.time() - t0, 'sec')
+    print("oriented_astar_prioritized_multi_goals:", time.time() - t0, "sec")
     return success_flags, paths

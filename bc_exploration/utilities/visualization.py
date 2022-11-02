@@ -96,9 +96,7 @@ def draw_scan_ranges(visualization_map, state, scan_angles, scan_ranges, color):
     pts = np.empty((occupied_coords.shape[0] * 2, 2), dtype=int)
     pts[::2] = position
     pts[1::2] = occupied_coords[:, [1, 0]]
-    cv2.polylines(
-        visualization_map.data, [pts], False, color, 1, cv2.LINE_AA
-    )
+    cv2.polylines(visualization_map.data, [pts], False, color, 1, cv2.LINE_AA)
     # visualization_map.data[occupied_coords[:, 0], occupied_coords[:, 1]] = color
 
 

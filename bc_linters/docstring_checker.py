@@ -10,7 +10,7 @@ from pylint.checkers.base import _BasicChecker
 from pylint.checkers.utils import check_messages, get_node_last_lineno, safe_infer
 from collections import namedtuple
 
-NO_REQUIRED_DOC_RGX = re.compile('^_')
+NO_REQUIRED_DOC_RGX = re.compile("^_")
 PY3K = sys.version_info >= (3, 0)
 
 
@@ -72,15 +72,18 @@ MSGS = {
         "Argument '%s' is documented multiple times",
         "duplicate-argument-docstring",
         "Every argument has to be documented only once",
-    )
+    ),
 }
 
 
-ReturnDocstring = namedtuple('ReturnDocstring', [
-    'doc_line',  # String, full line of the docstring
-    'type',  # String, Documented type
-    'description',  # String, description
-])
+ReturnDocstring = namedtuple(
+    "ReturnDocstring",
+    [
+        "doc_line",  # String, full line of the docstring
+        "type",  # String, Documented type
+        "description",  # String, description
+    ],
+)
 
 
 class DocstringChecker(_BasicChecker):
@@ -110,8 +113,8 @@ class DocstringChecker(_BasicChecker):
                 "type": "regexp",
                 "metavar": "<regexp>",
                 "help": "Regular expression which should match "
-                        "function or class names that has to have "
-                        "docstring, even if bc-no-docstring-rgx say otherwise",
+                "function or class names that has to have "
+                "docstring, even if bc-no-docstring-rgx say otherwise",
             },
         ),
         (
@@ -148,7 +151,9 @@ class DocstringChecker(_BasicChecker):
     @check_messages(*list(MSGS.keys()))
     def visit_functiondef(self, node):  # pylint: disable=bc-missing-docstring
         no_docstring = self.config.bc_no_docstring_rgx.match(node.name) is not None
-        has_to_have_docstring = self.config.bc_has_to_have_docstring_rgx.match(node.name) is not None
+        has_to_have_docstring = (
+            self.config.bc_has_to_have_docstring_rgx.match(node.name) is not None
+        )
         if has_to_have_docstring or not no_docstring:
             ftype = "method" if node.is_method() else "function"
             if node.decorators and self._is_setter_or_deleter(node):
@@ -163,11 +168,12 @@ class DocstringChecker(_BasicChecker):
                     ):
                         overridden = True
                         break
-                is_constructor = node.name == '__init__'
+                is_constructor = node.name == "__init__"
                 self._check_docstring(
-                    ftype, node,
+                    ftype,
+                    node,
                     report_missing=not overridden or is_constructor,
-                    is_constructor=is_constructor
+                    is_constructor=is_constructor,
                 )
             elif isinstance(node.parent.frame(), astroid.Module):
                 self._check_docstring(ftype, node)
@@ -176,7 +182,9 @@ class DocstringChecker(_BasicChecker):
 
     visit_asyncfunctiondef = visit_functiondef
 
-    def _check_docstring(self, node_type, node, report_missing=True, is_constructor=False):
+    def _check_docstring(
+        self, node_type, node, report_missing=True, is_constructor=False
+    ):
         """Check function and module docstring to comply with standards
         :param node_type String: string type of the node (e.g. "module")
         :param node astroid.Node: ast node of the cheking
@@ -187,7 +195,7 @@ class DocstringChecker(_BasicChecker):
         if docstring is None:
             if not report_missing:
                 return
-            if is_constructor and _extract_node_arg_names(node) == ['self']:
+            if is_constructor and _extract_node_arg_names(node) == ["self"]:
                 # its ok to have empty contstructor doc if there are no arguments
                 return
             lines = get_node_last_lineno(node) - node.lineno
@@ -201,7 +209,11 @@ class DocstringChecker(_BasicChecker):
             if node_type != "module" and max_lines > -1 and lines < max_lines:
                 return
 
-            if node.body and isinstance(node.body[0], astroid.Expr) and isinstance(node.body[0].value, astroid.Call):
+            if (
+                node.body
+                and isinstance(node.body[0], astroid.Expr)
+                and isinstance(node.body[0].value, astroid.Call)
+            ):
                 # Most likely a string with a format call. Let's see.
                 func = safe_infer(node.body[0].value.func)
                 if isinstance(func, astroid.BoundMethod) and isinstance(
@@ -213,41 +225,65 @@ class DocstringChecker(_BasicChecker):
                     if func.bound.name in ("str", "unicode", "bytes"):
                         return
 
-            self.add_message(
-                "bc-missing-docstring", node=node, args=(node_type,)
-            )
+            self.add_message("bc-missing-docstring", node=node, args=(node_type,))
         elif not docstring.strip():
-            self.add_message(
-                "bc-empty-docstring", node=node, args=(node_type,)
-            )
+            self.add_message("bc-empty-docstring", node=node, args=(node_type,))
         else:
-            if node_type == 'method':
+            if node_type == "method":
                 # Check if the "@staticmethod" decorator exists
-                is_static_method = any(['staticmethod' in decoratorname for decoratorname in node.decoratornames()])
-                is_abstract_method = any(['abstractmethod' in decoratorname for decoratorname in node.decoratornames()])
+                is_static_method = any(
+                    [
+                        "staticmethod" in decoratorname
+                        for decoratorname in node.decoratornames()
+                    ]
+                )
+                is_abstract_method = any(
+                    [
+                        "abstractmethod" in decoratorname
+                        for decoratorname in node.decoratornames()
+                    ]
+                )
                 if is_static_method:
-                    self._check_braincorp_docstring(docstring, _extract_node_arg_names(node), node,
-                                                    check_function_description=True,
-                                                    enforce_return_consistency=not is_abstract_method)
+                    self._check_braincorp_docstring(
+                        docstring,
+                        _extract_node_arg_names(node),
+                        node,
+                        check_function_description=True,
+                        enforce_return_consistency=not is_abstract_method,
+                    )
                 else:
-                    self._check_braincorp_docstring(docstring, _extract_node_arg_names(node)[1:], node,
-                                                    check_function_description=not is_constructor,
-                                                    enforce_return_consistency=not is_abstract_method)
-            elif node_type == 'function':
-                self._check_braincorp_docstring(docstring, _extract_node_arg_names(node), node,
-                                                check_function_description=True,
-                                                enforce_return_consistency=True)
+                    self._check_braincorp_docstring(
+                        docstring,
+                        _extract_node_arg_names(node)[1:],
+                        node,
+                        check_function_description=not is_constructor,
+                        enforce_return_consistency=not is_abstract_method,
+                    )
+            elif node_type == "function":
+                self._check_braincorp_docstring(
+                    docstring,
+                    _extract_node_arg_names(node),
+                    node,
+                    check_function_description=True,
+                    enforce_return_consistency=True,
+                )
 
-    def _check_braincorp_docstring(self, docstring, arguments, node, check_function_description,
-                                   enforce_return_consistency):
-        '''
+    def _check_braincorp_docstring(
+        self,
+        docstring,
+        arguments,
+        node,
+        check_function_description,
+        enforce_return_consistency,
+    ):
+        """
         Check that docstrings complies to the format (see below)
         :param docstring string: docstring
         :param arguments Collection[string]: list of argument names according to function definition
         :param node astroid.Node: node from ast
         :param check_function_description bool: whether to check function description length
         :param enforce_return_consistency bool: whether to check that return documentation is consistent with the code
-        '''
+        """
         minimal_description_length = 6
         description = []
         total_description_length = 0
@@ -262,12 +298,15 @@ class DocstringChecker(_BasicChecker):
             if argument_result is not None:
                 if return_statement is not None:
                     self.add_message(
-                        "argument-after-return-docstring", node=node, args=(argument_result.group(1), return_statement.doc_line)
+                        "argument-after-return-docstring",
+                        node=node,
+                        args=(argument_result.group(1), return_statement.doc_line),
                     )
-                if check_function_description and total_description_length < minimal_description_length:
-                    self.add_message(
-                        "empty-function-description-docstring", node=node
-                    )
+                if (
+                    check_function_description
+                    and total_description_length < minimal_description_length
+                ):
+                    self.add_message("empty-function-description-docstring", node=node)
                     return
                 argument_name = argument_result.group(1)
                 if argument_name in parsed_arguments:
@@ -275,59 +314,68 @@ class DocstringChecker(_BasicChecker):
                         "duplicate-argument-docstring", node=node, args=(argument_name,)
                     )
                 else:
-                    parsed_arguments[argument_name] = (l.strip(), argument_result.group(3), argument_result.group(5))
+                    parsed_arguments[argument_name] = (
+                        l.strip(),
+                        argument_result.group(3),
+                        argument_result.group(5),
+                    )
             else:
                 return_result = return_pattern.match(l.strip())
                 if return_result is not None:
                     if return_statement is not None:
                         self.add_message(
-                            "return-after-return-docstring", node=node, args=(l.strip(), return_statement.doc_line)
+                            "return-after-return-docstring",
+                            node=node,
+                            args=(l.strip(), return_statement.doc_line),
                         )
-                    if check_function_description and total_description_length < minimal_description_length:
+                    if (
+                        check_function_description
+                        and total_description_length < minimal_description_length
+                    ):
                         self.add_message(
                             "empty-function-description-docstring", node=node
                         )
                         return
-                    return_statement = ReturnDocstring(l.strip(), return_result.group(2), return_result.group(4))
+                    return_statement = ReturnDocstring(
+                        l.strip(), return_result.group(2), return_result.group(4)
+                    )
                 else:
                     description.append(l.strip())
                     total_description_length += len(l.strip())
 
         for a in arguments:
-            if a not in parsed_arguments or (a in parsed_arguments and len(parsed_arguments[a][2]) < minimal_description_length):
-                self.add_message(
-                    "missing-argument-docstring", node=node, args=(a,)
-                )
+            if a not in parsed_arguments or (
+                a in parsed_arguments
+                and len(parsed_arguments[a][2]) < minimal_description_length
+            ):
+                self.add_message("missing-argument-docstring", node=node, args=(a,))
         for a in parsed_arguments:
             if a not in arguments:
-                self.add_message(
-                    "extra-argument-docstring", node=node, args=(a,)
-                )
+                self.add_message("extra-argument-docstring", node=node, args=(a,))
 
-        if set(arguments) == set(parsed_arguments.keys()) and list(arguments) != list(parsed_arguments.keys()):
-            self.add_message(
-                "wrong-parameter-order-docstring", node=node
-            )
+        if set(arguments) == set(parsed_arguments.keys()) and list(arguments) != list(
+            parsed_arguments.keys()
+        ):
+            self.add_message("wrong-parameter-order-docstring", node=node)
 
         if enforce_return_consistency:
             has_return = node_has_non_empty_return(node)
-            if has_return and (return_statement is None or len(return_statement.description) < minimal_description_length):
-                self.add_message(
-                    "no-return-docstring", node=node
-                )
+            if has_return and (
+                return_statement is None
+                or len(return_statement.description) < minimal_description_length
+            ):
+                self.add_message("no-return-docstring", node=node)
 
             if not has_return and return_statement is not None:
-                self.add_message(
-                    "unnecessary-return-docstring", node=node
-                )
+                self.add_message("unnecessary-return-docstring", node=node)
 
 
 def node_has_non_empty_return(node):
-    '''
+    """
     Whether a node has a return statement without any result
     :param node astroid.Node: ast node
     :return Bool: True if node has "return smth" in it
-    '''
+    """
     if isinstance(node, astroid.Return) and node.value is not None:
         return True
     for child in node.get_children():
