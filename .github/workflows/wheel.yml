@@ -12,7 +12,7 @@ jobs:
     build_wheel:
         runs-on: ubuntu-20.04
         container:
-            image: ghcr.io/daizhirui/gp-sddf-ubuntu20.04:latest
+            image: ghcr.io/daizhirui/gp-sddf:22.04
             credentials:
                 username: ${{ secrets.DOCKER_USERNAME }}
                 password: ${{ secrets.DOCKER_TOKEN }}
