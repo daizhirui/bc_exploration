@@ -28,7 +28,7 @@ endif()
 include_directories(SYSTEM deps/eigen)
 include_directories(${PROJECT_SOURCE_DIR}/bc_exploration/cpp/include)
 
-file(GLOB SOURCE_FILES bc_exploration/cpp/src/*.cpp)
+file(GLOB_RECURSE SOURCE_FILES bc_exploration/cpp/src/*.cpp)
 
 pybind11_add_module(_exploration_cpp ${SOURCE_FILES} NO_EXTRAS)
 target_link_libraries(_exploration_cpp PUBLIC ${PYTHON_LIBRARIES} pthread OpenMP::OpenMP_CXX)
